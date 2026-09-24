@@ -1,1676 +1,696 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Deerbook | The Hunter's Social Network</title>
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons (free) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <!-- Three.js for 3D Terrain Rendering -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Google GenAI SDK & Firebase -->
-    <script type="importmap">
-      {
-        "imports": {
-          "@google/genai": "https://esm.run/@google/genai",
-          "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-          "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DeerBook</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        fb: { bg:'#18191a', card:'#242526', border:'#393a3b', hover:'#3a3b3c', text:'#e4e6eb', secondary:'#b0b3b8', primary:'#1877f2' }
       }
-    </script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        fb: { bg: '#18191a', card: '#242526', border: '#393a3b', hover: '#3a3b3c', text: '#e4e6eb', secondary: '#b0b3b8', primary: '#1877f2' }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #18191a; color: #e4e6eb; }
-        #map { width: 100%; height: 100%; z-index: 1; }
-        .leaflet-popup-content-wrapper, .leaflet-popup-tip { background-color: #242526 !important; color: #e4e6eb !important; border: 1px solid #393a3b; border-radius: 8px; }
-        .fb-card { background-color: #242526; border: 1px solid #393a3b; border-radius: 8px; }
-        .fb-input { background-color: #3a3b3c; border: 1px solid #393a3b; color: #e4e6eb; }
-        .fb-input:focus { outline: none; border-color: #1877f2; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        #canvas-3d-container canvas { width: 100% !important; height: 100% !important; outline: none; display: block; }
-        /* Allow text selection in inputs, textareas, and content areas */
-        input, textarea, #posts-stream, #ai-chat-messages, #terrain-ai-box { user-select: text; -webkit-user-select: text; }
-        .db-logo {
-            width: 40px; height: 40px; border-radius: 8px;
-            background: #1877f2;
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            flex-shrink: 0;
-            overflow: hidden;
-        }
-        .db-logo svg { width: 32px; height: 32px; display: block; }
-        .db-logo-lg { width: 72px; height: 72px; border-radius: 14px; }
-        .db-logo-lg svg { width: 56px; height: 56px; }
-        .db-wordmark {
-            font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
-            font-weight: 700; font-size: 1.35rem; letter-spacing: -0.02em;
-            color: #e4e6eb;
-        }
-        .db-wordmark span { color: #1877f2; }
-        .like-active { color: #1877f2 !important; font-weight: 700; }
-        .comment-box { display: none; }
-        .comment-box.open { display: block; }
-    </style>
+    }
+  }
+}
+</script>
+<style>
+  body,html{height:100%;margin:0;background:#18191a;color:#e4e6eb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .hide-scrollbar::-webkit-scrollbar{display:none}
+  .hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+  .story-ring{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)}
+  .like-active{color:#1877f2!important;font-weight:700}
+  input,textarea{user-select:text;-webkit-user-select:text}
+</style>
 </head>
-<body class="bg-fb-bg text-fb-text flex flex-col h-screen">
+<body class="bg-fb-bg text-fb-text flex flex-col h-screen overflow-hidden">
 
-    <!-- Top Navigation Bar -->
-    <header class="bg-fb-card border-b border-fb-border px-4 py-2 flex items-center justify-between z-30 shadow-md">
-        <!-- Left Brand & Search -->
-        <div class="flex items-center space-x-3">
-            <div class="flex items-center gap-2 select-none" title="DeerBook">
-                <img src="data:image/png;base64,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//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/v9//+/Here is the code provided in the source file:
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Deerbook | The Hunter's Social Network</title>
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="[https://unpkg.com/leaflet@1.9.4/dist/leaflet.css](https://unpkg.com/leaflet@1.9.4/dist/leaflet.css)" crossorigin=""/>
-    <!-- Tailwind CSS -->
-    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
-    <!-- FontAwesome Icons (free) -->
-    <link rel="stylesheet" href="[https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css](https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css)">
-    <!-- Three.js for 3D Terrain Rendering -->
-    <script src="[https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js](https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js)"></script>
-    <!-- Google GenAI SDK & Firebase -->
-    <script type="importmap">
-      {
-        "imports": {
-          "@google/genai": "[https://esm.run/@google/genai](https://esm.run/@google/genai)",
-          "firebase/app": "[https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js](https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js)",
-          "firebase/firestore": "[https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js](https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js)"
-        }
-      }
-    </script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        fb: { bg: '#18191a', card: '#242526', border: '#393a3b', hover: '#3a3b3c', text: '#e4e6eb', secondary: '#b0b3b8', primary: '#1877f2' }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #18191a; color: #e4e6eb; }
-        #map { width: 100%; height: 100%; z-index: 1; }
-        .leaflet-popup-content-wrapper, .leaflet-popup-tip { background-color: #242526 !important; color: #e4e6eb !important; border: 1px solid #393a3b; border-radius: 8px; }
-        .fb-card { background-color: #242526; border: 1px solid #393a3b; border-radius: 8px; }
-        .fb-input { background-color: #3a3b3c; border: 1px solid #393a3b; color: #e4e6eb; }
-        .fb-input:focus { outline: none; border-color: #1877f2; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        #canvas-3d-container canvas { width: 100% !important; height: 100% !important; outline: none; display: block; }
-        /* Allow text selection in inputs, textareas, and content areas */
-        input, textarea, #posts-stream, #ai-chat-messages, #terrain-ai-box { user-select: text; -webkit-user-select: text; }
-        .db-logo {
-            width: 40px; height: 40px; border-radius: 8px;
-            background: #1877f2;
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            flex-shrink: 0;
-            overflow: hidden;
-        }
-        .db-logo svg { width: 32px; height: 32px; display: block; }
-        .db-logo-lg { width: 72px; height: 72px; border-radius: 14px; }
-        .db-logo-lg svg { width: 56px; height: 56px; }
-        .db-wordmark {
-            font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
-            font-weight: 700; font-size: 1.35rem; letter-spacing: -0.02em;
-            color: #e4e6eb;
-        }
-        .db-wordmark span { color: #1877f2; }
-        .like-active { color: #1877f2 !important; font-weight: 700; }
-        .comment-box { display: none; }
-        .comment-box.open { display: block; }
-    </style>
-</head>
-<body class="bg-fb-bg text-fb-text flex flex-col h-screen">
-
-    <!-- Top Navigation Bar -->
-    <header class="bg-fb-card border-b border-fb-border px-4 py-2 flex items-center justify-between z-30 shadow-md">
-        <!-- Left Brand & Search -->
-        <div class="flex items-center space-x-3">
-            <div class="flex items-center gap-2 select-none" title="DeerBook">
-                <img src="data:image/png;base64,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G+2TfNpfyef9lQxlOgnw+LprSU96TisEvsp5wU7m+AGOMpeMRkkcIdJ0HU1WaYYBoogBDPU/8SpJUJ6gfUk1ycwwE53eNQix83S3e9YsKCBAe9Hi8dQqJd5ySQvLOtvw4rnjsaOUfQYhKWaMf8/xAMlU8Ujz343AIU3/lqKVMwGKEJITKFOjoAmuKgR4coFfx0J+YWSnKWV4gWvWOTa203f56R7r+lKqJc2gWv9p0j6wXwXhLz6Gz13wJvL6N9lPevl00W9YkXnZfH4L3eE2oDqV0bX0nOesB/o/z9x/4t76L2r2r+7Zz313aN8b+p3r//70P6XvR24v26k5P9uJpX5eO8r73r5N/wX21415f33Xy0J/97PZ4J//a9/0S3D8f4N28b/7t659/u4D9f7/f0Pz2X6n4O9F/n7D//+d7w/u+v01v5tF/aM5d67y7/v37t9z8H409+f4M73+1Tf3wz2v9Pq5+5Z/28r3jK9u871h/XfcfX7T9N21+dM0ff5ZzL2eP1972b9+R74ff+32+r97v8tA6T+z8f46b//d78Afdz/96rX6Y/f//4Xv57u3aef/5s6P+/2P63z+4u39T1+/73/93/9/z/D3P+8H73/7Wv0//Ojv/2t+x+/53v/+z8Xf//P9//u//39P9j//+/2r73/3z/vv/699f13v//wP2n/8v//9P7//v+8///b///rf/9/3v/+//v//vr7/+///b7/e9v8v7z9n/v///t//+//vt/4r7//3+9/f///wAA//8DAF01H9tN4a1CAAAAAElFTkSuQmCC" alt="DeerBook" class="db-logo-img" width="40" height="40" style="width:40px;height:40px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.3);display:block;"/>
-                <span class="db-wordmark hidden sm:inline">Deer<span>Book</span></span>
-            </div>
-            <div class="hidden md:flex items-center bg-fb-input rounded-full px-3 py-1.5 space-x-2 border border-fb-border">
-                <i class="fa-solid fa-search text-fb-secondary text-xs"></i>
-                <input type="text" placeholder="Search Deerbook..." class="bg-transparent text-xs text-fb-text focus:outline-none w-36" aria-label="Search">
-            </div>
-        </div>
-
-        <!-- Center Nav Tabs -->
-        <div class="flex items-center space-x-1 sm:space-x-4">
-            <button onclick="switchTab('feed')" id="nav-tab-feed" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-[#1877f2] border-b-4 border-[#1877f2] transition" aria-label="Feed">
-                <i class="fa-solid fa-house text-lg"></i>
-                <span class="text-[10px] font-semibold">Feed</span>
-            </button>
-            <button onclick="switchTab('map')" id="nav-tab-map" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-fb-secondary hover:bg-fb-hover transition" aria-label="Topo Map">
-                <i class="fa-solid fa-map text-lg"></i>
-                <span class="text-[10px] font-semibold">Topo Map</span>
-            </button>
-            <button onclick="switchTab('terrain3d')" id="nav-tab-terrain3d" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-fb-secondary hover:bg-fb-hover transition" aria-label="3D Terrain">
-                <i class="fa-solid fa-cube text-lg"></i>
-                <span class="text-[10px] font-semibold">3D Terrain</span>
-            </button>
-            <button onclick="switchTab('ai')" id="nav-tab-ai" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-fb-secondary hover:bg-fb-hover transition" aria-label="AI Scout">
-                <i class="fa-solid fa-robot text-lg"></i>
-                <span class="text-[10px] font-semibold">AI Scout</span>
-            </button>
-            <button onclick="switchTab('messenger')" id="nav-tab-messenger" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-fb-secondary hover:bg-fb-hover transition relative" aria-label="Messenger">
-                <i class="fa-brands fa-facebook-messenger text-lg"></i>
-                <span class="text-[10px] font-semibold">Messenger</span>
-                <span id="msg-badge" class="hidden absolute top-1 right-2 sm:right-3 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold items-center justify-center">0</span>
-            </button>
-        </div>
-
-        <!-- Right Account & Share Options -->
-        <div class="flex items-center space-x-2">
-            <button onclick="openModal('share-modal')" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-3 py-1.5 rounded-full text-xs font-bold transition shadow flex items-center gap-1.5">
-                <i class="fa-solid fa-share-nodes"></i> <span class="hidden md:inline">Share Link</span>
-            </button>
-            <button onclick="openModal('settings-modal')" class="w-10 h-10 rounded-full bg-fb-input flex items-center justify-center hover:bg-fb-hover transition text-fb-secondary" aria-label="Settings">
-                <i class="fa-solid fa-gear"></i>
-            </button>
-        </div>
-    </header>
-
-    <!-- Main Workspace Area -->
-    <div class="relative flex-1 w-full h-full overflow-hidden flex">
-
-        <!-- 1. FEED TAB CONTENT -->
-        <div id="view-feed" class="absolute inset-0 z-10 bg-fb-bg flex overflow-y-auto hide-scrollbar">
-            <!-- Left Sidebar -->
-            <div class="hidden lg:block w-72 p-4 space-y-3 sticky top-0 h-full overflow-y-auto border-r border-fb-border">
-                <div class="flex items-center space-x-3 p-2 rounded-xl hover:bg-fb-hover cursor-pointer transition" onclick="openModal('settings-modal')">
-                    <div id="sidebar-avatar" class="w-9 h-9 rounded-full bg-[#1877f2] flex items-center justify-center font-bold text-white">H</div>
-                    <span class="font-bold text-sm text-fb-text" id="sidebar-user-name">Camp Hunter</span>
-                </div>
-                <div class="flex items-center space-x-3 p-2 rounded-xl hover:bg-fb-hover cursor-pointer transition text-[#1877f2] font-semibold text-xs" onclick="switchTab('map')">
-                    <i class="fa-solid fa-map-location-dot w-6 text-base"></i><span>Interactive Topo Map</span>
-                </div>
-                <div class="flex items-center space-x-3 p-2 rounded-xl hover:bg-fb-hover cursor-pointer transition text-blue-400 font-semibold text-xs" onclick="switchTab('terrain3d')">
-                    <i class="fa-solid fa-cubes w-6 text-base"></i><span>3D Land Visualizer</span>
-                </div>
-                <div class="flex items-center space-x-3 p-2 rounded-xl hover:bg-fb-hover cursor-pointer transition text-sky-400 font-semibold text-xs" onclick="switchTab('ai')">
-                    <i class="fa-solid fa-brain w-6 text-base"></i><span>Gemini Rut Scout</span>
-                </div>
-                <hr class="border-fb-border my-2">
-                <div class="text-[11px] font-bold text-fb-secondary uppercase px-2">Camp Shortcuts</div>
-                <div class="p-2 rounded-xl hover:bg-fb-hover cursor-pointer text-xs text-fb-secondary">Nova Scotia Crown Land</div>
-                <div class="p-2 rounded-xl hover:bg-fb-hover cursor-pointer text-xs text-fb-secondary">Rut Tracker & Rubs</div>
-            </div>
-
-            <!-- Central News Feed Stream -->
-            <div class="flex-1 max-w-xl mx-auto p-4 space-y-4 pb-24">
-                <!-- Create Post Box -->
-                <div class="fb-card p-4 shadow-md space-y-3">
-                    <div class="flex items-center space-x-3">
-                        <div id="post-avatar" class="w-10 h-10 rounded-full bg-[#1877f2] flex items-center justify-center font-bold text-white">H</div>
-                        <input type="text" id="post-author-input" value="Nova Scotia Hunter" class="fb-input rounded-full px-4 py-2 text-xs w-1/2 font-bold text-blue-400" aria-label="Author name" readonly>
-                    </div>
-                    <textarea id="post-text-input" rows="3" placeholder="What's happening in the woods? Drop harvest photos, buck sightings, or camp updates..." class="w-full fb-input rounded-xl p-3 text-xs resize-none" aria-label="Post text"></textarea>
-                    
-                    <div class="flex items-center justify-between pt-2 border-t border-fb-border">
-                        <label class="cursor-pointer hover:bg-fb-hover px-3 py-1.5 rounded-xl text-xs text-blue-400 flex items-center gap-1.5 transition">
-                            <i class="fa-solid fa-camera"></i> <span id="photo-label">Attach Photo</span>
-                            <input type="file" id="post-file-input" accept="image/*" class="hidden" onchange="handlePhoto(event)">
-                        </label>
-                        <button onclick="submitPost()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-5 py-2 rounded-xl text-xs font-bold shadow transition">Post</button>
-                    </div>
-                </div>
-
-                <!-- Live Stream Container -->
-                <div id="posts-stream" class="space-y-4">
-                    <div class="text-center py-10 text-fb-secondary text-xs">Loading Deerbook feed...</div>
-                </div>
-            </div>
-
-            <!-- Right Sidebar -->
-            <div class="hidden xl:block w-72 p-4 space-y-4 sticky top-0 h-full overflow-y-auto border-l border-fb-border">
-                <div class="fb-card p-3 space-y-2">
-                    <div class="font-bold text-xs text-fb-secondary flex items-center gap-1.5"><i class="fa-solid fa-cloud-sun text-amber-400"></i> Live Weather (NS)</div>
-                    <div class="text-xs space-y-1 text-gray-300" id="weather-widget">
-                        <div>Loading live conditions…</div>
-                    </div>
-                </div>
-                <div class="fb-card p-3 space-y-2">
-                    <div class="font-bold text-xs text-fb-secondary"><i class="fa-solid fa-users text-blue-500"></i> Online Now</div>
-                    <div class="space-y-2 text-xs" id="online-crew">
-                        <div class="text-fb-secondary">Sign in to appear online</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 2. MAP TAB CONTENT -->
-        <div id="view-map" class="absolute inset-0 z-0 bg-fb-bg hidden flex flex-col">
-            <div id="map" class="w-full flex-1"></div>
-            <!-- Floating Map Actions -->
-            <div class="absolute right-3 top-3 z-[400] flex flex-col space-y-2">
-                <button onclick="panGPS()" class="fb-card w-11 h-11 rounded-full flex items-center justify-center text-blue-400 shadow-xl hover:bg-fb-hover" title="My Location" aria-label="My Location"><i class="fa-solid fa-location-crosshairs"></i></button>
-                <button onclick="dropWaypoint()" class="fb-card w-11 h-11 rounded-full flex items-center justify-center text-amber-400 shadow-xl hover:bg-fb-hover" title="Drop Waypoint" aria-label="Drop Waypoint"><i class="fa-solid fa-map-pin"></i></button>
-            </div>
-        </div>
-
-        <!-- 3. 3D TERRAIN TAB CONTENT -->
-        <div id="view-terrain3d" class="absolute inset-0 z-0 bg-fb-bg hidden flex flex-col p-4">
-            <div class="fb-card flex-1 rounded-2xl flex flex-col p-4 relative overflow-hidden border border-fb-border shadow-2xl">
-                <div class="flex items-center justify-between pb-3 border-b border-fb-border">
-                    <div>
-                        <h2 class="font-bold text-sm text-blue-400 flex items-center gap-2"><i class="fa-solid fa-cubes"></i> 3D Topographical Land Visualizer</h2>
-                        <p class="text-[10px] text-fb-secondary" id="terrain-label">Center: 45.72° N, -63.58° W (400m Radius)</p>
-                    </div>
-                    <button onclick="runTerrainAI()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow flex items-center gap-1"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Analysis</button>
-                </div>
-                <div id="canvas-3d-container" class="flex-1 my-3 bg-black rounded-xl relative overflow-hidden">
-                    <div class="absolute bottom-3 left-3 bg-black/80 backdrop-blur px-3 py-1.5 rounded-xl text-[10px] text-gray-300 pointer-events-none border border-fb-border z-10">
-                        <i class="fa-solid fa-arrows-rotate text-blue-400 mr-1"></i> Drag to rotate mesh | Scroll to zoom
-                    </div>
-                </div>
-                <div id="terrain-ai-box" class="fb-card p-3 text-xs text-gray-300 max-h-24 overflow-y-auto">
-                    <span class="text-blue-400 font-bold">Deerbook AI Scout:</span> Click "AI Analysis" to review ridge lines, saddles, and thermal bedding pockets.
-                </div>
-            </div>
-        </div>
-
-        <!-- 4. AI SCOUT TAB CONTENT -->
-        <div id="view-ai" class="absolute inset-0 z-0 bg-fb-bg hidden flex flex-col p-4">
-            <div class="fb-card flex-1 max-w-2xl mx-auto w-full rounded-2xl flex flex-col p-4 shadow-2xl">
-                <div class="flex items-center justify-between pb-3 border-b border-fb-border">
-                    <h2 class="font-bold text-sm text-blue-400 flex items-center gap-2"><i class="fa-solid fa-robot"></i> Gemini Hunting Guide</h2>
-                </div>
-                <div id="ai-chat-messages" class="flex-1 overflow-y-auto space-y-3 py-3 pr-1 text-xs">
-                    <div class="p-3 rounded-xl bg-blue-950/60 border border-blue-900/50 max-w-[85%]">
-                        <div class="font-bold text-blue-400 mb-1">Deerbook AI</div>
-                        <div>Hello hunter! Ask me anything about Nova Scotia wildlife regulations, white-tailed deer behavior, rut phases, or wind thermals.</div>
-                    </div>
-                </div>
-                <div class="pt-3 border-t border-fb-border flex gap-2">
-                    <input type="text" id="ai-input" placeholder="Ask about rut triggers, scent control..." onkeypress="handleAiKey(event)" class="flex-1 fb-input rounded-xl px-3 py-2 text-xs" aria-label="AI message">
-                    <button onclick="sendAiMessage()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-4 py-2 rounded-xl text-xs font-bold shadow" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 5. MESSENGER TAB CONTENT -->
-        <div id="view-messenger" class="absolute inset-0 z-0 bg-fb-bg hidden flex flex-col">
-            <div class="flex flex-1 overflow-hidden max-w-5xl mx-auto w-full">
-                <!-- Conversation list -->
-                <div id="msg-list-panel" class="w-full sm:w-80 border-r border-fb-border flex flex-col bg-fb-card">
-                    <div class="p-3 border-b border-fb-border flex items-center justify-between">
-                        <h2 class="font-bold text-sm text-white flex items-center gap-2"><i class="fa-brands fa-facebook-messenger text-blue-400"></i> Chats</h2>
-                        <button onclick="startNewChat()" class="w-8 h-8 rounded-full bg-fb-input hover:bg-fb-hover flex items-center justify-center text-blue-400" title="New message" aria-label="New message">
-                            <i class="fa-solid fa-pen-to-square"></i>
-                        </button>
-                    </div>
-                    <div class="p-2 border-b border-fb-border">
-                        <input type="text" id="msg-search" placeholder="Search chats..." class="w-full fb-input rounded-full px-3 py-1.5 text-xs" oninput="renderConversations()">
-                    </div>
-                    <div id="msg-conversations" class="flex-1 overflow-y-auto hide-scrollbar">
-                        <div class="p-4 text-center text-fb-secondary text-xs">No conversations yet</div>
-                    </div>
-                </div>
-                <!-- Active chat -->
-                <div id="msg-chat-panel" class="hidden sm:flex flex-1 flex-col bg-fb-bg">
-                    <div id="msg-chat-empty" class="flex-1 flex items-center justify-center text-fb-secondary text-xs p-6 text-center">
-                        Select a conversation or start a new message
-                    </div>
-                    <div id="msg-chat-active" class="hidden flex-1 flex flex-col">
-                        <div class="p-3 border-b border-fb-border bg-fb-card flex items-center gap-3">
-                            <button onclick="backToMsgList()" class="sm:hidden text-fb-secondary hover:text-white"><i class="fa-solid fa-arrow-left"></i></button>
-                            <div id="msg-peer-avatar" class="w-9 h-9 rounded-full bg-[#1877f2] flex items-center justify-center font-bold text-white text-sm">?</div>
-                            <div>
-                                <div id="msg-peer-name" class="font-bold text-sm text-white">Hunter</div>
-                                <div class="text-[10px] text-fb-secondary">Deerbook Messenger</div>
-                            </div>
-                        </div>
-                        <div id="msg-thread" class="flex-1 overflow-y-auto p-3 space-y-2 hide-scrollbar"></div>
-                        <div class="p-3 border-t border-fb-border bg-fb-card flex gap-2">
-                            <input type="text" id="msg-input" placeholder="Aa" class="flex-1 fb-input rounded-full px-4 py-2 text-xs" onkeydown="if(event.key==='Enter')sendMessage()">
-                            <button onclick="sendMessage()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white w-10 h-10 rounded-full flex items-center justify-center shadow" aria-label="Send">
-                                <i class="fa-solid fa-paper-plane text-sm"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+<!-- AUTH SCREENS -->
+<div id="auth-screen" class="fixed inset-0 z-[5000] bg-fb-bg flex flex-col items-center justify-center p-4">
+  <div class="w-full max-w-md">
+    <div class="flex flex-col items-center mb-8">
+      <img id="auth-logo" src="" alt="DeerBook" class="w-20 h-20 rounded-2xl shadow-lg mb-3">
+      <h1 class="text-3xl font-bold tracking-tight">Deer<span class="text-fb-primary">Book</span></h1>
+      <p class="text-fb-secondary text-sm mt-1">The Hunter's Social Network</p>
     </div>
 
-    <!-- SHARE LINK MODAL -->
-    <div id="share-modal" class="fixed inset-0 z-[3000] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="fb-card w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl">
-            <div class="flex items-center justify-between pb-2 border-b border-fb-border">
-                <h3 class="font-bold text-sm text-white flex items-center gap-2"><i class="fa-solid fa-share-nodes text-blue-400"></i> Invite Camp Crew</h3>
-                <button onclick="closeModal('share-modal')" class="text-fb-secondary hover:text-white" aria-label="Close"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <p class="text-xs text-gray-300">Copy this link and send it to your hunting partners. When they open it, they'll see your Deerbook stream and map pins instantly:</p>
-            <div class="flex gap-2">
-                <input type="text" id="share-link-box" readonly class="flex-1 fb-input rounded-xl px-3 py-2 text-xs text-blue-400 font-mono select-all">
-                <button onclick="copyLink()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-4 py-2 rounded-xl text-xs font-bold shadow">Copy</button>
-            </div>
-        </div>
+    <!-- Login Form -->
+    <div id="login-form" class="fb-card p-6 rounded-xl space-y-4">
+      <h2 class="text-xl font-bold text-center">Log In</h2>
+      <div>
+        <label class="text-xs text-fb-secondary">Email</label>
+        <input id="login-email" type="email" class="w-full mt-1 bg-fb-hover border border-fb-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-fb-primary" placeholder="you@example.com">
+      </div>
+      <div>
+        <label class="text-xs text-fb-secondary">Password</label>
+        <input id="login-password" type="password" class="w-full mt-1 bg-fb-hover border border-fb-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-fb-primary" placeholder="••••••••">
+      </div>
+      <p id="login-error" class="text-red-400 text-xs hidden"></p>
+      <button onclick="handleLogin()" class="w-full bg-fb-primary hover:bg-blue-600 text-white font-semibold py-2.5 rounded-lg transition">Log In</button>
+      <p class="text-center text-sm text-fb-secondary">Don't have an account? <button onclick="showRegister()" class="text-fb-primary font-semibold">Sign Up</button></p>
     </div>
 
-    <!-- SETTINGS MODAL -->
-    <div id="settings-modal" class="fixed inset-0 z-[3000] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="fb-card w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl">
-            <div class="flex items-center justify-between pb-2 border-b border-fb-border">
-                <h3 class="font-bold text-sm text-white flex items-center gap-2"><i class="fa-solid fa-gear text-blue-400"></i> Deerbook Settings</h3>
-                <button onclick="closeModal('settings-modal')" class="text-fb-secondary hover:text-white" aria-label="Close"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <div class="space-y-3 text-xs">
-                <div id="settings-account-block" class="fb-card p-3 space-y-1">
-                    <div class="font-bold text-fb-secondary text-[11px] uppercase">Your Account</div>
-                    <div class="text-white font-semibold" id="settings-display-name">—</div>
-                    <div class="text-fb-secondary" id="settings-camp-name">—</div>
-                    <button onclick="signOut()" class="mt-2 text-red-400 hover:text-red-300 text-[11px] font-semibold">Sign out & switch account</button>
-                </div>
-                <hr class="border-fb-border">
-                <div class="fb-card p-3 space-y-2">
-                    <div class="font-bold text-fb-secondary text-[11px] uppercase flex items-center gap-1.5"><i class="fa-solid fa-bell"></i> Push Notifications</div>
-                    <p class="text-gray-300 text-[11px]">Get alerts for new Messenger messages even when Deerbook is in the background.</p>
-                    <div class="flex items-center justify-between gap-2">
-                        <span class="text-fb-secondary" id="notif-status">Checking…</span>
-                        <button onclick="enableNotifications()" id="notif-enable-btn" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-3 py-1.5 rounded-xl text-[11px] font-bold shadow">Enable</button>
-                    </div>
-                    <button onclick="testNotification()" class="w-full fb-input hover:bg-fb-hover py-1.5 rounded-xl text-[11px] font-semibold text-fb-secondary">Send test notification</button>
-                </div>
-                <hr class="border-fb-border">
-                <p class="text-gray-300">Enter your Google Gemini API key to power the AI scout and weather search grounding. Get a free key at <a href="[https://aistudio.google.com/apikey](https://aistudio.google.com/apikey)" target="_blank" rel="noopener" class="text-blue-400 underline">Google AI Studio</a>.</p>
-                <div>
-                    <label class="block text-fb-secondary mb-1" for="api-key-input">Gemini API Key</label>
-                    <input type="password" id="api-key-input" placeholder="AIzaSy..." class="w-full fb-input rounded-xl px-3 py-2" autocomplete="off">
-                </div>
-                <button onclick="saveApiKey()" class="w-full bg-[#1877f2] hover:bg-[#166fe5] text-white font-bold py-2.5 rounded-xl shadow">Save Configuration</button>
-            </div>
+    <!-- Register Form -->
+    <div id="register-form" class="fb-card p-6 rounded-xl space-y-4 hidden">
+      <h2 class="text-xl font-bold text-center">Create Account</h2>
+      <div>
+        <label class="text-xs text-fb-secondary">Display Name</label>
+        <input id="reg-name" type="text" class="w-full mt-1 bg-fb-hover border border-fb-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-fb-primary" placeholder="Nova Scotia Hunter">
+      </div>
+      <div>
+        <label class="text-xs text-fb-secondary">Camp / Location</label>
+        <input id="reg-camp" type="text" class="w-full mt-1 bg-fb-hover border border-fb-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-fb-primary" placeholder="North Mountain Camp">
+      </div>
+      <div>
+        <label class="text-xs text-fb-secondary">Email</label>
+        <input id="reg-email" type="email" class="w-full mt-1 bg-fb-hover border border-fb-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-fb-primary" placeholder="you@example.com">
+      </div>
+      <div>
+        <label class="text-xs text-fb-secondary">Password (min 6 chars)</label>
+        <input id="reg-password" type="password" class="w-full mt-1 bg-fb-hover border border-fb-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-fb-primary" placeholder="••••••••">
+      </div>
+      <p id="reg-error" class="text-red-400 text-xs hidden"></p>
+      <button onclick="handleRegister()" class="w-full bg-fb-primary hover:bg-blue-600 text-white font-semibold py-2.5 rounded-lg transition">Create Account</button>
+      <p class="text-center text-sm text-fb-secondary">Already have an account? <button onclick="showLogin()" class="text-fb-primary font-semibold">Log In</button></p>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" class="hidden flex flex-col h-full">
+  <!-- Header -->
+  <header class="bg-fb-card border-b border-fb-border px-3 py-2 flex items-center justify-between z-30 shadow-md flex-shrink-0">
+    <div class="flex items-center gap-2">
+      <img id="header-logo" src="" alt="DeerBook" class="w-9 h-9 rounded-lg shadow">
+      <span class="font-bold text-lg hidden sm:inline">Deer<span class="text-fb-primary">Book</span></span>
+    </div>
+    <div class="flex items-center gap-1 sm:gap-3">
+      <button onclick="switchTab('feed')" id="tab-feed" class="flex flex-col items-center justify-center h-11 w-14 sm:w-16 rounded-lg text-fb-primary border-b-2 border-fb-primary">
+        <i class="fa-solid fa-house text-lg"></i>
+        <span class="text-[10px] font-semibold">Feed</span>
+      </button>
+      <button onclick="switchTab('stories')" id="tab-stories" class="flex flex-col items-center justify-center h-11 w-14 sm:w-16 rounded-lg text-fb-secondary hover:bg-fb-hover">
+        <i class="fa-solid fa-circle-plus text-lg"></i>
+        <span class="text-[10px] font-semibold">Stories</span>
+      </button>
+      <button onclick="switchTab('messenger')" id="tab-messenger" class="flex flex-col items-center justify-center h-11 w-14 sm:w-16 rounded-lg text-fb-secondary hover:bg-fb-hover relative">
+        <i class="fa-brands fa-facebook-messenger text-lg"></i>
+        <span class="text-[10px] font-semibold">Chat</span>
+        <span id="msg-badge" class="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full hidden"></span>
+      </button>
+      <button onclick="openProfile()" class="flex flex-col items-center justify-center h-11 w-14 sm:w-16 rounded-lg text-fb-secondary hover:bg-fb-hover">
+        <div id="header-avatar" class="w-7 h-7 rounded-full bg-fb-primary flex items-center justify-center text-xs font-bold text-white">H</div>
+        <span class="text-[10px] font-semibold">Me</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- FEED -->
+  <div id="view-feed" class="flex-1 overflow-y-auto hide-scrollbar">
+    <!-- Stories bar -->
+    <div class="bg-fb-card border-b border-fb-border p-3">
+      <div class="flex gap-3 overflow-x-auto hide-scrollbar pb-1">
+        <div class="flex-shrink-0 flex flex-col items-center gap-1 cursor-pointer" onclick="openStoryUpload()">
+          <div class="w-16 h-16 rounded-full bg-fb-hover border-2 border-dashed border-fb-secondary flex items-center justify-center relative">
+            <i class="fa-solid fa-plus text-fb-secondary text-xl"></i>
+          </div>
+          <span class="text-[11px] text-fb-secondary">Your Story</span>
         </div>
+        <div id="stories-list" class="flex gap-3"></div>
+      </div>
     </div>
 
-    <!-- JOIN / REGISTER MODAL (required for free account) -->
-    <div id="join-modal" class="fixed inset-0 z-[4000] bg-black/90 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="fb-card w-full max-w-md rounded-2xl p-6 space-y-5 shadow-2xl">
-            <div class="text-center space-y-2">
-                <img src="data:image/png;base64,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G+2TfNpfyef9lQxlOgnw+LprSU96TisEvsp5wU7m+AGOMpeMRkkcIdJ0HU1WaYYBoogBDPU/8SpJUJ6gfUk1ycwwE53eNQix83S3e9YsKCBAe9Hi8dQqJd5ySQvLOtvw4rnjsaOUfQYhKWaMf8/xAMlU8Ujz343AIU3/lqKVMwGKEJITKFOjoAmuKgR4coFfx0J+YWSnKWV4gWvWOTa203f56R7r+lKqJc2gWv9p0j6wXwXhLz6Gz13wJvL6N9lPevl00W9YkXnZfH4L3eH2oDqV0bX0nOesB/o/z9x/4t76L2r2r+7Zz313aN8b+p3r/70P6XvR24v26k5P9uJpX5eO8r73r5N/wX21415f33Xy0J/97PZ4J//a9/0S3D8f4N28b/7t659/u4D9f7/f0Pz2X6n4O9F/n7D//+d7w/u+v01v5tF/aM5d67y7/v37t9z8H409+f4M73+1Tf3wz2v9Pq5+5Z/28r3jK9u871h/XfcfX7T9N21+dM0ff5ZzL2eP1972b9+R74ff+32+r97v8tA6T+z8f46b//d78Afdz/96rX6Y/f//4Xv57u3aef/5s6P+/2P63z+4u39T1+/73/93/9/z/D3P+8H73/7Wv0//Ojv/2t+x+/53v/+z8Xf//P9//u//39P9j//+/2r73/3z/vv/699f13v//wP2n/8v//9P7//v+8///b///rf/9/3v/+//v//vr7/+///b7/e9v8v7z9n/v///t//+//vt/4r7//3+9/f///wAA//8DAF01H9tN4a1CAAAAAElFTkSuQmCC" alt="DeerBook" class="db-logo-img" width="40" height="40" style="width:40px;height:40px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.3);display:block;"/>
-                <span class="db-wordmark hidden sm:inline">Deer<span>Book</span></span>
-            </div>
-            <div class="hidden md:flex items-center bg-fb-input rounded-full px-3 py-1.5 space-x-2 border border-fb-border">
-                <i class="fa-solid fa-search text-fb-secondary text-xs"></i>
-                <input type="text" placeholder="Search Deerbook..." class="bg-transparent text-xs text-fb-text focus:outline-none w-36" aria-label="Search">
-            </div>
+    <!-- Create post -->
+    <div class="bg-fb-card m-3 p-3 rounded-xl border border-fb-border">
+      <div class="flex gap-3 items-start">
+        <div id="post-avatar" class="w-10 h-10 rounded-full bg-fb-primary flex items-center justify-center font-bold text-white flex-shrink-0">H</div>
+        <div class="flex-1">
+          <textarea id="post-text" rows="2" placeholder="What's happening in the woods?" class="w-full bg-fb-hover border border-fb-border rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-fb-primary"></textarea>
+          <div id="post-preview" class="mt-2 hidden">
+            <img id="post-preview-img" class="max-h-48 rounded-lg object-cover">
+            <button onclick="clearPostPhoto()" class="text-xs text-red-400 mt-1">Remove photo</button>
+          </div>
+          <div class="flex items-center justify-between mt-2">
+            <label class="flex items-center gap-2 text-sm text-fb-secondary cursor-pointer hover:text-fb-primary">
+              <i class="fa-solid fa-camera"></i> Photo
+              <input type="file" id="post-file" accept="image/*" class="hidden" onchange="handlePostPhoto(event)">
+            </label>
+            <button onclick="createPost()" class="bg-fb-primary hover:bg-blue-600 text-white text-sm font-semibold px-4 py-1.5 rounded-lg">Post</button>
+          </div>
         </div>
-
-        <!-- Center Nav Tabs -->
-        <div class="flex items-center space-x-1 sm:space-x-4">
-            <button onclick="switchTab('feed')" id="nav-tab-feed" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-[#1877f2] border-b-4 border-[#1877f2] transition" aria-label="Feed">
-                <i class="fa-solid fa-house text-lg"></i>
-                <span class="text-[10px] font-semibold">Feed</span>
-            </button>
-            <button onclick="switchTab('map')" id="nav-tab-map" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-fb-secondary hover:bg-fb-hover transition" aria-label="Topo Map">
-                <i class="fa-solid fa-map text-lg"></i>
-                <span class="text-[10px] font-semibold">Topo Map</span>
-            </button>
-            <button onclick="switchTab('terrain3d')" id="nav-tab-terrain3d" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-fb-secondary hover:bg-fb-hover transition" aria-label="3D Terrain">
-                <i class="fa-solid fa-cube text-lg"></i>
-                <span class="text-[10px] font-semibold">3D Terrain</span>
-            </button>
-            <button onclick="switchTab('ai')" id="nav-tab-ai" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-fb-secondary hover:bg-fb-hover transition" aria-label="AI Scout">
-                <i class="fa-solid fa-robot text-lg"></i>
-                <span class="text-[10px] font-semibold">AI Scout</span>
-            </button>
-            <button onclick="switchTab('messenger')" id="nav-tab-messenger" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-fb-secondary hover:bg-fb-hover transition relative" aria-label="Messenger">
-                <i class="fa-brands fa-facebook-messenger text-lg"></i>
-                <span class="text-[10px] font-semibold">Messenger</span>
-                <span id="msg-badge" class="hidden absolute top-1 right-2 sm:right-3 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold items-center justify-center">0</span>
-            </button>
-        </div>
-
-        <!-- Right Account & Share Options -->
-        <div class="flex items-center space-x-2">
-            <button onclick="openModal('share-modal')" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-3 py-1.5 rounded-full text-xs font-bold transition shadow flex items-center gap-1.5">
-                <i class="fa-solid fa-share-nodes"></i> <span class="hidden md:inline">Share Link</span>
-            </button>
-            <button onclick="openModal('settings-modal')" class="w-10 h-10 rounded-full bg-fb-input flex items-center justify-center hover:bg-fb-hover transition text-fb-secondary" aria-label="Settings">
-                <i class="fa-solid fa-gear"></i>
-            </button>
-        </div>
-    </header>
-
-    <!-- Main Workspace Area -->
-    <div class="relative flex-1 w-full h-full overflow-hidden flex">
-
-        <!-- 1. FEED TAB CONTENT -->
-        <div id="view-feed" class="absolute inset-0 z-10 bg-fb-bg flex overflow-y-auto hide-scrollbar">
-            <!-- Left Sidebar -->
-            <div class="hidden lg:block w-72 p-4 space-y-3 sticky top-0 h-full overflow-y-auto border-r border-fb-border">
-                <div class="flex items-center space-x-3 p-2 rounded-xl hover:bg-fb-hover cursor-pointer transition" onclick="openModal('settings-modal')">
-                    <div id="sidebar-avatar" class="w-9 h-9 rounded-full bg-[#1877f2] flex items-center justify-center font-bold text-white">H</div>
-                    <span class="font-bold text-sm text-fb-text" id="sidebar-user-name">Camp Hunter</span>
-                </div>
-                <div class="flex items-center space-x-3 p-2 rounded-xl hover:bg-fb-hover cursor-pointer transition text-[#1877f2] font-semibold text-xs" onclick="switchTab('map')">
-                    <i class="fa-solid fa-map-location-dot w-6 text-base"></i><span>Interactive Topo Map</span>
-                </div>
-                <div class="flex items-center space-x-3 p-2 rounded-xl hover:bg-fb-hover cursor-pointer transition text-blue-400 font-semibold text-xs" onclick="switchTab('terrain3d')">
-                    <i class="fa-solid fa-cubes w-6 text-base"></i><span>3D Land Visualizer</span>
-                </div>
-                <div class="flex items-center space-x-3 p-2 rounded-xl hover:bg-fb-hover cursor-pointer transition text-sky-400 font-semibold text-xs" onclick="switchTab('ai')">
-                    <i class="fa-solid fa-brain w-6 text-base"></i><span>Gemini Rut Scout</span>
-                </div>
-                <hr class="border-fb-border my-2">
-                <div class="text-[11px] font-bold text-fb-secondary uppercase px-2">Camp Shortcuts</div>
-                <div class="p-2 rounded-xl hover:bg-fb-hover cursor-pointer text-xs text-fb-secondary">Nova Scotia Crown Land</div>
-                <div class="p-2 rounded-xl hover:bg-fb-hover cursor-pointer text-xs text-fb-secondary">Rut Tracker & Rubs</div>
-            </div>
-
-            <!-- Central News Feed Stream -->
-            <div class="flex-1 max-w-xl mx-auto p-4 space-y-4 pb-24">
-                <!-- Create Post Box -->
-                <div class="fb-card p-4 shadow-md space-y-3">
-                    <div class="flex items-center space-x-3">
-                        <div id="post-avatar" class="w-10 h-10 rounded-full bg-[#1877f2] flex items-center justify-center font-bold text-white">H</div>
-                        <input type="text" id="post-author-input" value="Nova Scotia Hunter" class="fb-input rounded-full px-4 py-2 text-xs w-1/2 font-bold text-blue-400" aria-label="Author name" readonly>
-                    </div>
-                    <textarea id="post-text-input" rows="3" placeholder="What's happening in the woods? Drop harvest photos, buck sightings, or camp updates..." class="w-full fb-input rounded-xl p-3 text-xs resize-none" aria-label="Post text"></textarea>
-                    
-                    <div class="flex items-center justify-between pt-2 border-t border-fb-border">
-                        <label class="cursor-pointer hover:bg-fb-hover px-3 py-1.5 rounded-xl text-xs text-blue-400 flex items-center gap-1.5 transition">
-                            <i class="fa-solid fa-camera"></i> <span id="photo-label">Attach Photo</span>
-                            <input type="file" id="post-file-input" accept="image/*" class="hidden" onchange="handlePhoto(event)">
-                        </label>
-                        <button onclick="submitPost()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-5 py-2 rounded-xl text-xs font-bold shadow transition">Post</button>
-                    </div>
-                </div>
-
-                <!-- Live Stream Container -->
-                <div id="posts-stream" class="space-y-4">
-                    <div class="text-center py-10 text-fb-secondary text-xs">Loading Deerbook feed...</div>
-                </div>
-            </div>
-
-            <!-- Right Sidebar -->
-            <div class="hidden xl:block w-72 p-4 space-y-4 sticky top-0 h-full overflow-y-auto border-l border-fb-border">
-                <div class="fb-card p-3 space-y-2">
-                    <div class="font-bold text-xs text-fb-secondary flex items-center gap-1.5"><i class="fa-solid fa-cloud-sun text-amber-400"></i> Live Weather (NS)</div>
-                    <div class="text-xs space-y-1 text-gray-300" id="weather-widget">
-                        <div>Loading live conditions…</div>
-                    </div>
-                </div>
-                <div class="fb-card p-3 space-y-2">
-                    <div class="font-bold text-xs text-fb-secondary"><i class="fa-solid fa-users text-blue-500"></i> Online Now</div>
-                    <div class="space-y-2 text-xs" id="online-crew">
-                        <div class="text-fb-secondary">Sign in to appear online</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 2. MAP TAB CONTENT -->
-        <div id="view-map" class="absolute inset-0 z-0 bg-fb-bg hidden flex flex-col">
-            <div id="map" class="w-full flex-1"></div>
-            <!-- Floating Map Actions -->
-            <div class="absolute right-3 top-3 z-[400] flex flex-col space-y-2">
-                <button onclick="panGPS()" class="fb-card w-11 h-11 rounded-full flex items-center justify-center text-blue-400 shadow-xl hover:bg-fb-hover" title="My Location" aria-label="My Location"><i class="fa-solid fa-location-crosshairs"></i></button>
-                <button onclick="dropWaypoint()" class="fb-card w-11 h-11 rounded-full flex items-center justify-center text-amber-400 shadow-xl hover:bg-fb-hover" title="Drop Waypoint" aria-label="Drop Waypoint"><i class="fa-solid fa-map-pin"></i></button>
-            </div>
-        </div>
-
-        <!-- 3. 3D TERRAIN TAB CONTENT -->
-        <div id="view-terrain3d" class="absolute inset-0 z-0 bg-fb-bg hidden flex flex-col p-4">
-            <div class="fb-card flex-1 rounded-2xl flex flex-col p-4 relative overflow-hidden border border-fb-border shadow-2xl">
-                <div class="flex items-center justify-between pb-3 border-b border-fb-border">
-                    <div>
-                        <h2 class="font-bold text-sm text-blue-400 flex items-center gap-2"><i class="fa-solid fa-cubes"></i> 3D Topographical Land Visualizer</h2>
-                        <p class="text-[10px] text-fb-secondary" id="terrain-label">Center: 45.72° N, -63.58° W (400m Radius)</p>
-                    </div>
-                    <button onclick="runTerrainAI()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow flex items-center gap-1"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Analysis</button>
-                </div>
-                <div id="canvas-3d-container" class="flex-1 my-3 bg-black rounded-xl relative overflow-hidden">
-                    <div class="absolute bottom-3 left-3 bg-black/80 backdrop-blur px-3 py-1.5 rounded-xl text-[10px] text-gray-300 pointer-events-none border border-fb-border z-10">
-                        <i class="fa-solid fa-arrows-rotate text-blue-400 mr-1"></i> Drag to rotate mesh | Scroll to zoom
-                    </div>
-                </div>
-                <div id="terrain-ai-box" class="fb-card p-3 text-xs text-gray-300 max-h-24 overflow-y-auto">
-                    <span class="text-blue-400 font-bold">Deerbook AI Scout:</span> Click "AI Analysis" to review ridge lines, saddles, and thermal bedding pockets.
-                </div>
-            </div>
-        </div>
-
-        <!-- 4. AI SCOUT TAB CONTENT -->
-        <div id="view-ai" class="absolute inset-0 z-0 bg-fb-bg hidden flex flex-col p-4">
-            <div class="fb-card flex-1 max-w-2xl mx-auto w-full rounded-2xl flex flex-col p-4 shadow-2xl">
-                <div class="flex items-center justify-between pb-3 border-b border-fb-border">
-                    <h2 class="font-bold text-sm text-blue-400 flex items-center gap-2"><i class="fa-solid fa-robot"></i> Gemini Hunting Guide</h2>
-                </div>
-                <div id="ai-chat-messages" class="flex-1 overflow-y-auto space-y-3 py-3 pr-1 text-xs">
-                    <div class="p-3 rounded-xl bg-blue-950/60 border border-blue-900/50 max-w-[85%]">
-                        <div class="font-bold text-blue-400 mb-1">Deerbook AI</div>
-                        <div>Hello hunter! Ask me anything about Nova Scotia wildlife regulations, white-tailed deer behavior, rut phases, or wind thermals.</div>
-                    </div>
-                </div>
-                <div class="pt-3 border-t border-fb-border flex gap-2">
-                    <input type="text" id="ai-input" placeholder="Ask about rut triggers, scent control..." onkeypress="handleAiKey(event)" class="flex-1 fb-input rounded-xl px-3 py-2 text-xs" aria-label="AI message">
-                    <button onclick="sendAiMessage()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-4 py-2 rounded-xl text-xs font-bold shadow" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 5. MESSENGER TAB CONTENT -->
-        <div id="view-messenger" class="absolute inset-0 z-0 bg-fb-bg hidden flex flex-col">
-            <div class="flex flex-1 overflow-hidden max-w-5xl mx-auto w-full">
-                <!-- Conversation list -->
-                <div id="msg-list-panel" class="w-full sm:w-80 border-r border-fb-border flex flex-col bg-fb-card">
-                    <div class="p-3 border-b border-fb-border flex items-center justify-between">
-                        <h2 class="font-bold text-sm text-white flex items-center gap-2"><i class="fa-brands fa-facebook-messenger text-blue-400"></i> Chats</h2>
-                        <button onclick="startNewChat()" class="w-8 h-8 rounded-full bg-fb-input hover:bg-fb-hover flex items-center justify-center text-blue-400" title="New message" aria-label="New message">
-                            <i class="fa-solid fa-pen-to-square"></i>
-                        </button>
-                    </div>
-                    <div class="p-2 border-b border-fb-border">
-                        <input type="text" id="msg-search" placeholder="Search chats..." class="w-full fb-input rounded-full px-3 py-1.5 text-xs" oninput="renderConversations()">
-                    </div>
-                    <div id="msg-conversations" class="flex-1 overflow-y-auto hide-scrollbar">
-                        <div class="p-4 text-center text-fb-secondary text-xs">No conversations yet</div>
-                    </div>
-                </div>
-                <!-- Active chat -->
-                <div id="msg-chat-panel" class="hidden sm:flex flex-1 flex-col bg-fb-bg">
-                    <div id="msg-chat-empty" class="flex-1 flex items-center justify-center text-fb-secondary text-xs p-6 text-center">
-                        Select a conversation or start a new message
-                    </div>
-                    <div id="msg-chat-active" class="hidden flex-1 flex flex-col">
-                        <div class="p-3 border-b border-fb-border bg-fb-card flex items-center gap-3">
-                            <button onclick="backToMsgList()" class="sm:hidden text-fb-secondary hover:text-white"><i class="fa-solid fa-arrow-left"></i></button>
-                            <div id="msg-peer-avatar" class="w-9 h-9 rounded-full bg-[#1877f2] flex items-center justify-center font-bold text-white text-sm">?</div>
-                            <div>
-                                <div id="msg-peer-name" class="font-bold text-sm text-white">Hunter</div>
-                                <div class="text-[10px] text-fb-secondary">Deerbook Messenger</div>
-                            </div>
-                        </div>
-                        <div id="msg-thread" class="flex-1 overflow-y-auto p-3 space-y-2 hide-scrollbar"></div>
-                        <div class="p-3 border-t border-fb-border bg-fb-card flex gap-2">
-                            <input type="text" id="msg-input" placeholder="Aa" class="flex-1 fb-input rounded-full px-4 py-2 text-xs" onkeydown="if(event.key==='Enter')sendMessage()">
-                            <button onclick="sendMessage()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white w-10 h-10 rounded-full flex items-center justify-center shadow" aria-label="Send">
-                                <i class="fa-solid fa-paper-plane text-sm"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+      </div>
     </div>
 
-    <!-- SHARE LINK MODAL -->
-    <div id="share-modal" class="fixed inset-0 z-[3000] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="fb-card w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl">
-            <div class="flex items-center justify-between pb-2 border-b border-fb-border">
-                <h3 class="font-bold text-sm text-white flex items-center gap-2"><i class="fa-solid fa-share-nodes text-blue-400"></i> Invite Camp Crew</h3>
-                <button onclick="closeModal('share-modal')" class="text-fb-secondary hover:text-white" aria-label="Close"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <p class="text-xs text-gray-300">Copy this link and send it to your hunting partners. When they open it, they'll see your Deerbook stream and map pins instantly:</p>
-            <div class="flex gap-2">
-                <input type="text" id="share-link-box" readonly class="flex-1 fb-input rounded-xl px-3 py-2 text-xs text-blue-400 font-mono select-all">
-                <button onclick="copyLink()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-4 py-2 rounded-xl text-xs font-bold shadow">Copy</button>
-            </div>
+    <!-- Posts stream -->
+    <div id="posts-stream" class="px-3 pb-6 space-y-3"></div>
+  </div>
+
+  <!-- STORIES VIEW -->
+  <div id="view-stories" class="hidden flex-1 overflow-y-auto hide-scrollbar p-3">
+    <h2 class="font-bold text-lg mb-3">Stories</h2>
+    <div id="all-stories" class="space-y-3"></div>
+  </div>
+
+  <!-- MESSENGER -->
+  <div id="view-messenger" class="hidden flex-1 flex flex-col">
+    <div class="flex flex-1 overflow-hidden">
+      <div id="msg-list-panel" class="w-full sm:w-80 border-r border-fb-border flex flex-col bg-fb-card">
+        <div class="p-3 border-b border-fb-border">
+          <h2 class="font-bold flex items-center gap-2"><i class="fa-brands fa-facebook-messenger text-fb-primary"></i> Chats</h2>
+          <input id="msg-search" type="text" placeholder="Search hunters..." class="w-full mt-2 bg-fb-hover border border-fb-border rounded-full px-3 py-1.5 text-xs focus:outline-none" oninput="renderConversations()">
         </div>
+        <div id="conversations" class="flex-1 overflow-y-auto hide-scrollbar"></div>
+        <div class="p-3 border-t border-fb-border">
+          <button onclick="startNewChat()" class="w-full bg-fb-primary hover:bg-blue-600 text-white text-sm font-semibold py-2 rounded-lg">New Chat</button>
+        </div>
+      </div>
+      <div id="msg-chat-panel" class="hidden sm:flex flex-1 flex-col bg-fb-bg">
+        <div id="msg-empty" class="flex-1 flex items-center justify-center text-fb-secondary text-sm">
+          Select a conversation or start a new chat
+        </div>
+        <div id="msg-active" class="hidden flex-1 flex flex-col">
+          <div class="p-3 border-b border-fb-border bg-fb-card flex items-center gap-3">
+            <div id="chat-peer-avatar" class="w-9 h-9 rounded-full bg-fb-primary flex items-center justify-center text-sm font-bold text-white">?</div>
+            <div>
+              <div id="chat-peer-name" class="font-semibold text-sm">Peer</div>
+              <div id="chat-peer-status" class="text-[11px] text-fb-secondary">Online</div>
+            </div>
+            <button onclick="closeChatMobile()" class="ml-auto sm:hidden text-fb-secondary"><i class="fa-solid fa-times"></i></button>
+          </div>
+          <div id="chat-messages" class="flex-1 overflow-y-auto hide-scrollbar p-3 space-y-2"></div>
+          <div class="p-3 border-t border-fb-border bg-fb-card flex gap-2">
+            <input id="chat-input" type="text" placeholder="Type a message..." class="flex-1 bg-fb-hover border border-fb-border rounded-full px-4 py-2 text-sm focus:outline-none focus:border-fb-primary" onkeydown="if(event.key==='Enter')sendMessage()">
+            <button onclick="sendMessage()" class="bg-fb-primary hover:bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center"><i class="fa-solid fa-paper-plane"></i></button>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <!-- SETTINGS MODAL -->
-    <div id="settings-modal" class="fixed inset-0 z-[3000] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="fb-card w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl">
-            <div class="flex items-center justify-between pb-2 border-b border-fb-border">
-                <h3 class="font-bold text-sm text-white flex items-center gap-2"><i class="fa-solid fa-gear text-blue-400"></i> Deerbook Settings</h3>
-                <button onclick="closeModal('settings-modal')" class="text-fb-secondary hover:text-white" aria-label="Close"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <div class="space-y-3 text-xs">
-                <div id="settings-account-block" class="fb-card p-3 space-y-1">
-                    <div class="font-bold text-fb-secondary text-[11px] uppercase">Your Account</div>
-                    <div class="text-white font-semibold" id="settings-display-name">—</div>
-                    <div class="text-fb-secondary" id="settings-camp-name">—</div>
-                    <button onclick="signOut()" class="mt-2 text-red-400 hover:text-red-300 text-[11px] font-semibold">Sign out & switch account</button>
-                </div>
-                <hr class="border-fb-border">
-                <div class="fb-card p-3 space-y-2">
-                    <div class="font-bold text-fb-secondary text-[11px] uppercase flex items-center gap-1.5"><i class="fa-solid fa-bell"></i> Push Notifications</div>
-                    <p class="text-gray-300 text-[11px]">Get alerts for new Messenger messages even when Deerbook is in the background.</p>
-                    <div class="flex items-center justify-between gap-2">
-                        <span class="text-fb-secondary" id="notif-status">Checking…</span>
-                        <button onclick="enableNotifications()" id="notif-enable-btn" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-3 py-1.5 rounded-xl text-[11px] font-bold shadow">Enable</button>
-                    </div>
-                    <button onclick="testNotification()" class="w-full fb-input hover:bg-fb-hover py-1.5 rounded-xl text-[11px] font-semibold text-fb-secondary">Send test notification</button>
-                </div>
-                <hr class="border-fb-border">
-                <p class="text-gray-300">Enter your Google Gemini API key to power the AI scout and weather search grounding. Get a free key at <a href="[https://aistudio.google.com/apikey](https://aistudio.google.com/apikey)" target="_blank" rel="noopener" class="text-blue-400 underline">Google AI Studio</a>.</p>
-                <div>
-                    <label class="block text-fb-secondary mb-1" for="api-key-input">Gemini API Key</label>
-                    <input type="password" id="api-key-input" placeholder="AIzaSy..." class="w-full fb-input rounded-xl px-3 py-2" autocomplete="off">
-                </div>
-                <button onclick="saveApiKey()" class="w-full bg-[#1877f2] hover:bg-[#166fe5] text-white font-bold py-2.5 rounded-xl shadow">Save Configuration</button>
-            </div>
-        </div>
+  <!-- PROFILE -->
+  <div id="view-profile" class="hidden flex-1 overflow-y-auto hide-scrollbar p-4">
+    <div class="max-w-md mx-auto space-y-4">
+      <div class="fb-card p-5 rounded-xl text-center">
+        <div id="profile-avatar" class="w-20 h-20 rounded-full bg-fb-primary flex items-center justify-center text-2xl font-bold text-white mx-auto mb-3">H</div>
+        <h2 id="profile-name" class="text-xl font-bold">Hunter</h2>
+        <p id="profile-camp" class="text-fb-secondary text-sm"></p>
+        <p id="profile-email" class="text-fb-secondary text-xs mt-1"></p>
+      </div>
+      <div class="fb-card p-4 rounded-xl space-y-3">
+        <h3 class="font-semibold text-sm">Account</h3>
+        <button onclick="logout()" class="w-full bg-red-600/20 hover:bg-red-600/40 text-red-400 font-semibold py-2.5 rounded-lg transition">Log Out</button>
+      </div>
+      <div class="fb-card p-4 rounded-xl space-y-2 text-xs text-fb-secondary">
+        <p>DeerBook stores data locally in this browser.</p>
+        <p>All posts, photos, stories and messages are real and persistent for your account.</p>
+      </div>
     </div>
+  </div>
+</div>
 
-    <!-- JOIN / REGISTER MODAL (required for free account) -->
-    <div id="join-modal" class="fixed inset-0 z-[4000] bg-black/90 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="fb-card w-full max-w-md rounded-2xl p-6 space-y-5 shadow-2xl">
-            <div class="text-center space-y-2">
-                <img src="data:image/png;base64,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G+2TfNpfyef9lQxlOgnw+LprSU96TisEvsp5wU7m+AGOMpeMRkkcIdJ0HU1WaYYBoogBDPU/8SpJUJ6gfUk1ycwwE53eNQix83S3e9YsKCBAe9Hi8dQqJd5ySQvLOtvw4rnjsaOUfQYhKWaMf8/xAMlU8Ujz343AIU3/lqKVMwGKEJITKFOjoAmuKgR4coFfx0J+YWSnKWV4gWvWOTa203f56R7r+lKqJc2gWv9p0j6wXwXhLz6Gz13wJvL6N9lPevl00W9YkXnZfH4L3eH2oDqV0bX0nOesB/o/z9x/4t76L2r2r+7Zz313aN8b+p3r/70P6XvR24v26k5P9uJpX5eO8r73r5N/wX21415f33Xy0J/97PZ4J//a9/0S3D8f4N28b/7t659/u4D9f7/f0Pz2X6n4O9F/n7D//+d7w/u+v01v5tF/aM5d67y7/v37t9z8H409+f4M73+1Tf3wz2v9Pq5+5Z/28r3jK9u871h/XfcfX7T9N21+dM0ff5ZzL2eP1972b9+R74ff+32+r97v8tA6T+z8f46b//d78Afdz/96rX6Y/f//4Xv57u3aef/5s6P+/2P63z+4u39T1+/73/93/9/z/D3P+8H73/7Wv0//Ojv/2t+x+/53v/+z8Xf//P9//u//39P9j//+/2r73/3z/vv/699f13v//wP2n/8v//9P7//v+8///b///rf/9/3v/+//v//vr7/+///b7/e9v8v7z9n/v///t//+//vt/4r7//3+9/f///wAA//8DAF01H9tN4a1CAAAAAElFTkSuQmCC" alt="DeerBook" class="db-logo-img" width="40" height="40" style="width:40px;height:40px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.3);display:block;"/>
-                <span class="db-wordmark hidden sm:inline">Deer<span>Book</span></span>
-            </div>
-            <div class="hidden md:flex items-center bg-fb-input rounded-full px-3 py-1.5 space-x-2 border border-fb-border">
-                <i class="fa-solid fa-search text-fb-secondary text-xs"></i>
-                <input type="text" placeholder="Search Deerbook..." class="bg-transparent text-xs text-fb-text focus:outline-none w-36" aria-label="Search">
-            </div>
-        </div>
-
-        <!-- Center Nav Tabs -->
-        <div class="flex items-center space-x-1 sm:space-x-4">
-            <button onclick="switchTab('feed')" id="nav-tab-feed" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-[#1877f2] border-b-4 border-[#1877f2] transition" aria-label="Feed">
-                <i class="fa-solid fa-house text-lg"></i>
-                <span class="text-[10px] font-semibold">Feed</span>
-            </button>
-            <button onclick="switchTab('map')" id="nav-tab-map" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-fb-secondary hover:bg-fb-hover transition" aria-label="Topo Map">
-                <i class="fa-solid fa-map text-lg"></i>
-                <span class="text-[10px] font-semibold">Topo Map</span>
-            </button>
-            <button onclick="switchTab('terrain3d')" id="nav-tab-terrain3d" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-fb-secondary hover:bg-fb-hover transition" aria-label="3D Terrain">
-                <i class="fa-solid fa-cube text-lg"></i>
-                <span class="text-[10px] font-semibold">3D Terrain</span>
-            </button>
-            <button onclick="switchTab('ai')" id="nav-tab-ai" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-fb-secondary hover:bg-fb-hover transition" aria-label="AI Scout">
-                <i class="fa-solid fa-robot text-lg"></i>
-                <span class="text-[10px] font-semibold">AI Scout</span>
-            </button>
-            <button onclick="switchTab('messenger')" id="nav-tab-messenger" class="flex flex-col items-center justify-center h-12 w-16 sm:w-20 rounded-xl text-fb-secondary hover:bg-fb-hover transition relative" aria-label="Messenger">
-                <i class="fa-brands fa-facebook-messenger text-lg"></i>
-                <span class="text-[10px] font-semibold">Messenger</span>
-                <span id="msg-badge" class="hidden absolute top-1 right-2 sm:right-3 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold items-center justify-center">0</span>
-            </button>
-        </div>
-
-        <!-- Right Account & Share Options -->
-        <div class="flex items-center space-x-2">
-            <button onclick="openModal('share-modal')" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-3 py-1.5 rounded-full text-xs font-bold transition shadow flex items-center gap-1.5">
-                <i class="fa-solid fa-share-nodes"></i> <span class="hidden md:inline">Share Link</span>
-            </button>
-            <button onclick="openModal('settings-modal')" class="w-10 h-10 rounded-full bg-fb-input flex items-center justify-center hover:bg-fb-hover transition text-fb-secondary" aria-label="Settings">
-                <i class="fa-solid fa-gear"></i>
-            </button>
-        </div>
-    </header>
-
-    <!-- Main Workspace Area -->
-    <div class="relative flex-1 w-full h-full overflow-hidden flex">
-
-        <!-- 1. FEED TAB CONTENT -->
-        <div id="view-feed" class="absolute inset-0 z-10 bg-fb-bg flex overflow-y-auto hide-scrollbar">
-            <!-- Left Sidebar -->
-            <div class="hidden lg:block w-72 p-4 space-y-3 sticky top-0 h-full overflow-y-auto border-r border-fb-border">
-                <div class="flex items-center space-x-3 p-2 rounded-xl hover:bg-fb-hover cursor-pointer transition" onclick="openModal('settings-modal')">
-                    <div id="sidebar-avatar" class="w-9 h-9 rounded-full bg-[#1877f2] flex items-center justify-center font-bold text-white">H</div>
-                    <span class="font-bold text-sm text-fb-text" id="sidebar-user-name">Camp Hunter</span>
-                </div>
-                <div class="flex items-center space-x-3 p-2 rounded-xl hover:bg-fb-hover cursor-pointer transition text-[#1877f2] font-semibold text-xs" onclick="switchTab('map')">
-                    <i class="fa-solid fa-map-location-dot w-6 text-base"></i><span>Interactive Topo Map</span>
-                </div>
-                <div class="flex items-center space-x-3 p-2 rounded-xl hover:bg-fb-hover cursor-pointer transition text-blue-400 font-semibold text-xs" onclick="switchTab('terrain3d')">
-                    <i class="fa-solid fa-cubes w-6 text-base"></i><span>3D Land Visualizer</span>
-                </div>
-                <div class="flex items-center space-x-3 p-2 rounded-xl hover:bg-fb-hover cursor-pointer transition text-sky-400 font-semibold text-xs" onclick="switchTab('ai')">
-                    <i class="fa-solid fa-brain w-6 text-base"></i><span>Gemini Rut Scout</span>
-                </div>
-                <hr class="border-fb-border my-2">
-                <div class="text-[11px] font-bold text-fb-secondary uppercase px-2">Camp Shortcuts</div>
-                <div class="p-2 rounded-xl hover:bg-fb-hover cursor-pointer text-xs text-fb-secondary">Nova Scotia Crown Land</div>
-                <div class="p-2 rounded-xl hover:bg-fb-hover cursor-pointer text-xs text-fb-secondary">Rut Tracker & Rubs</div>
-            </div>
-
-            <!-- Central News Feed Stream -->
-            <div class="flex-1 max-w-xl mx-auto p-4 space-y-4 pb-24">
-                <!-- Create Post Box -->
-                <div class="fb-card p-4 shadow-md space-y-3">
-                    <div class="flex items-center space-x-3">
-                        <div id="post-avatar" class="w-10 h-10 rounded-full bg-[#1877f2] flex items-center justify-center font-bold text-white">H</div>
-                        <input type="text" id="post-author-input" value="Nova Scotia Hunter" class="fb-input rounded-full px-4 py-2 text-xs w-1/2 font-bold text-blue-400" aria-label="Author name" readonly>
-                    </div>
-                    <textarea id="post-text-input" rows="3" placeholder="What's happening in the woods? Drop harvest photos, buck sightings, or camp updates..." class="w-full fb-input rounded-xl p-3 text-xs resize-none" aria-label="Post text"></textarea>
-                    
-                    <div class="flex items-center justify-between pt-2 border-t border-fb-border">
-                        <label class="cursor-pointer hover:bg-fb-hover px-3 py-1.5 rounded-xl text-xs text-blue-400 flex items-center gap-1.5 transition">
-                            <i class="fa-solid fa-camera"></i> <span id="photo-label">Attach Photo</span>
-                            <input type="file" id="post-file-input" accept="image/*" class="hidden" onchange="handlePhoto(event)">
-                        </label>
-                        <button onclick="submitPost()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-5 py-2 rounded-xl text-xs font-bold shadow transition">Post</button>
-                    </div>
-                </div>
-
-                <!-- Live Stream Container -->
-                <div id="posts-stream" class="space-y-4">
-                    <div class="text-center py-10 text-fb-secondary text-xs">Loading Deerbook feed...</div>
-                </div>
-            </div>
-
-            <!-- Right Sidebar -->
-            <div class="hidden xl:block w-72 p-4 space-y-4 sticky top-0 h-full overflow-y-auto border-l border-fb-border">
-                <div class="fb-card p-3 space-y-2">
-                    <div class="font-bold text-xs text-fb-secondary flex items-center gap-1.5"><i class="fa-solid fa-cloud-sun text-amber-400"></i> Live Weather (NS)</div>
-                    <div class="text-xs space-y-1 text-gray-300" id="weather-widget">
-                        <div>Loading live conditions…</div>
-                    </div>
-                </div>
-                <div class="fb-card p-3 space-y-2">
-                    <div class="font-bold text-xs text-fb-secondary"><i class="fa-solid fa-users text-blue-500"></i> Online Now</div>
-                    <div class="space-y-2 text-xs" id="online-crew">
-                        <div class="text-fb-secondary">Sign in to appear online</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 2. MAP TAB CONTENT -->
-        <div id="view-map" class="absolute inset-0 z-0 bg-fb-bg hidden flex flex-col">
-            <div id="map" class="w-full flex-1"></div>
-            <!-- Floating Map Actions -->
-            <div class="absolute right-3 top-3 z-[400] flex flex-col space-y-2">
-                <button onclick="panGPS()" class="fb-card w-11 h-11 rounded-full flex items-center justify-center text-blue-400 shadow-xl hover:bg-fb-hover" title="My Location" aria-label="My Location"><i class="fa-solid fa-location-crosshairs"></i></button>
-                <button onclick="dropWaypoint()" class="fb-card w-11 h-11 rounded-full flex items-center justify-center text-amber-400 shadow-xl hover:bg-fb-hover" title="Drop Waypoint" aria-label="Drop Waypoint"><i class="fa-solid fa-map-pin"></i></button>
-            </div>
-        </div>
-
-        <!-- 3. 3D TERRAIN TAB CONTENT -->
-        <div id="view-terrain3d" class="absolute inset-0 z-0 bg-fb-bg hidden flex flex-col p-4">
-            <div class="fb-card flex-1 rounded-2xl flex flex-col p-4 relative overflow-hidden border border-fb-border shadow-2xl">
-                <div class="flex items-center justify-between pb-3 border-b border-fb-border">
-                    <div>
-                        <h2 class="font-bold text-sm text-blue-400 flex items-center gap-2"><i class="fa-solid fa-cubes"></i> 3D Topographical Land Visualizer</h2>
-                        <p class="text-[10px] text-fb-secondary" id="terrain-label">Center: 45.72° N, -63.58° W (400m Radius)</p>
-                    </div>
-                    <button onclick="runTerrainAI()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow flex items-center gap-1"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Analysis</button>
-                </div>
-                <div id="canvas-3d-container" class="flex-1 my-3 bg-black rounded-xl relative overflow-hidden">
-                    <div class="absolute bottom-3 left-3 bg-black/80 backdrop-blur px-3 py-1.5 rounded-xl text-[10px] text-gray-300 pointer-events-none border border-fb-border z-10">
-                        <i class="fa-solid fa-arrows-rotate text-blue-400 mr-1"></i> Drag to rotate mesh | Scroll to zoom
-                    </div>
-                </div>
-                <div id="terrain-ai-box" class="fb-card p-3 text-xs text-gray-300 max-h-24 overflow-y-auto">
-                    <span class="text-blue-400 font-bold">Deerbook AI Scout:</span> Click "AI Analysis" to review ridge lines, saddles, and thermal bedding pockets.
-                </div>
-            </div>
-        </div>
-
-        <!-- 4. AI SCOUT TAB CONTENT -->
-        <div id="view-ai" class="absolute inset-0 z-0 bg-fb-bg hidden flex flex-col p-4">
-            <div class="fb-card flex-1 max-w-2xl mx-auto w-full rounded-2xl flex flex-col p-4 shadow-2xl">
-                <div class="flex items-center justify-between pb-3 border-b border-fb-border">
-                    <h2 class="font-bold text-sm text-blue-400 flex items-center gap-2"><i class="fa-solid fa-robot"></i> Gemini Hunting Guide</h2>
-                </div>
-                <div id="ai-chat-messages" class="flex-1 overflow-y-auto space-y-3 py-3 pr-1 text-xs">
-                    <div class="p-3 rounded-xl bg-blue-950/60 border border-blue-900/50 max-w-[85%]">
-                        <div class="font-bold text-blue-400 mb-1">Deerbook AI</div>
-                        <div>Hello hunter! Ask me anything about Nova Scotia wildlife regulations, white-tailed deer behavior, rut phases, or wind thermals.</div>
-                    </div>
-                </div>
-                <div class="pt-3 border-t border-fb-border flex gap-2">
-                    <input type="text" id="ai-input" placeholder="Ask about rut triggers, scent control..." onkeypress="handleAiKey(event)" class="flex-1 fb-input rounded-xl px-3 py-2 text-xs" aria-label="AI message">
-                    <button onclick="sendAiMessage()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-4 py-2 rounded-xl text-xs font-bold shadow" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 5. MESSENGER TAB CONTENT -->
-        <div id="view-messenger" class="absolute inset-0 z-0 bg-fb-bg hidden flex flex-col">
-            <div class="flex flex-1 overflow-hidden max-w-5xl mx-auto w-full">
-                <!-- Conversation list -->
-                <div id="msg-list-panel" class="w-full sm:w-80 border-r border-fb-border flex flex-col bg-fb-card">
-                    <div class="p-3 border-b border-fb-border flex items-center justify-between">
-                        <h2 class="font-bold text-sm text-white flex items-center gap-2"><i class="fa-brands fa-facebook-messenger text-blue-400"></i> Chats</h2>
-                        <button onclick="startNewChat()" class="w-8 h-8 rounded-full bg-fb-input hover:bg-fb-hover flex items-center justify-center text-blue-400" title="New message" aria-label="New message">
-                            <i class="fa-solid fa-pen-to-square"></i>
-                        </button>
-                    </div>
-                    <div class="p-2 border-b border-fb-border">
-                        <input type="text" id="msg-search" placeholder="Search chats..." class="w-full fb-input rounded-full px-3 py-1.5 text-xs" oninput="renderConversations()">
-                    </div>
-                    <div id="msg-conversations" class="flex-1 overflow-y-auto hide-scrollbar">
-                        <div class="p-4 text-center text-fb-secondary text-xs">No conversations yet</div>
-                    </div>
-                </div>
-                <!-- Active chat -->
-                <div id="msg-chat-panel" class="hidden sm:flex flex-1 flex-col bg-fb-bg">
-                    <div id="msg-chat-empty" class="flex-1 flex items-center justify-center text-fb-secondary text-xs p-6 text-center">
-                        Select a conversation or start a new message
-                    </div>
-                    <div id="msg-chat-active" class="hidden flex-1 flex flex-col">
-                        <div class="p-3 border-b border-fb-border bg-fb-card flex items-center gap-3">
-                            <button onclick="backToMsgList()" class="sm:hidden text-fb-secondary hover:text-white"><i class="fa-solid fa-arrow-left"></i></button>
-                            <div id="msg-peer-avatar" class="w-9 h-9 rounded-full bg-[#1877f2] flex items-center justify-center font-bold text-white text-sm">?</div>
-                            <div>
-                                <div id="msg-peer-name" class="font-bold text-sm text-white">Hunter</div>
-                                <div class="text-[10px] text-fb-secondary">Deerbook Messenger</div>
-                            </div>
-                        </div>
-                        <div id="msg-thread" class="flex-1 overflow-y-auto p-3 space-y-2 hide-scrollbar"></div>
-                        <div class="p-3 border-t border-fb-border bg-fb-card flex gap-2">
-                            <input type="text" id="msg-input" placeholder="Aa" class="flex-1 fb-input rounded-full px-4 py-2 text-xs" onkeydown="if(event.key==='Enter')sendMessage()">
-                            <button onclick="sendMessage()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white w-10 h-10 rounded-full flex items-center justify-center shadow" aria-label="Send">
-                                <i class="fa-solid fa-paper-plane text-sm"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+<!-- Story Viewer Modal -->
+<div id="story-viewer" class="fixed inset-0 z-[6000] bg-black hidden flex flex-col">
+  <div class="absolute top-0 left-0 right-0 h-1 bg-white/20">
+    <div id="story-progress" class="h-full bg-white transition-all duration-100" style="width:0%"></div>
+  </div>
+  <div class="flex items-center justify-between p-3 absolute top-2 left-0 right-0 z-10">
+    <div class="flex items-center gap-2">
+      <div id="story-author-avatar" class="w-8 h-8 rounded-full bg-fb-primary flex items-center justify-center text-xs font-bold text-white">H</div>
+      <span id="story-author-name" class="text-white text-sm font-semibold"></span>
+      <span id="story-time" class="text-white/60 text-xs"></span>
     </div>
+    <button onclick="closeStoryViewer()" class="text-white text-xl"><i class="fa-solid fa-times"></i></button>
+  </div>
+  <div class="flex-1 flex items-center justify-center">
+    <img id="story-img" class="max-w-full max-h-full object-contain" src="">
+  </div>
+  <div class="p-4 text-center text-white text-sm" id="story-caption"></div>
+</div>
 
-    <!-- SHARE LINK MODAL -->
-    <div id="share-modal" class="fixed inset-0 z-[3000] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="fb-card w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl">
-            <div class="flex items-center justify-between pb-2 border-b border-fb-border">
-                <h3 class="font-bold text-sm text-white flex items-center gap-2"><i class="fa-solid fa-share-nodes text-blue-400"></i> Invite Camp Crew</h3>
-                <button onclick="closeModal('share-modal')" class="text-fb-secondary hover:text-white" aria-label="Close"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <p class="text-xs text-gray-300">Copy this link and send it to your hunting partners. When they open it, they'll see your Deerbook stream and map pins instantly:</p>
-            <div class="flex gap-2">
-                <input type="text" id="share-link-box" readonly class="flex-1 fb-input rounded-xl px-3 py-2 text-xs text-blue-400 font-mono select-all">
-                <button onclick="copyLink()" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-4 py-2 rounded-xl text-xs font-bold shadow">Copy</button>
-            </div>
-        </div>
+<!-- Story Upload Modal -->
+<div id="story-upload-modal" class="fixed inset-0 z-[5500] bg-black/80 hidden flex items-center justify-center p-4">
+  <div class="bg-fb-card rounded-xl w-full max-w-sm p-5 space-y-4">
+    <h3 class="font-bold text-lg">Add to Your Story</h3>
+    <div id="story-upload-preview" class="hidden">
+      <img id="story-upload-img" class="w-full max-h-64 object-cover rounded-lg">
     </div>
-
-    <!-- SETTINGS MODAL -->
-    <div id="settings-modal" class="fixed inset-0 z-[3000] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="fb-card w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl">
-            <div class="flex items-center justify-between pb-2 border-b border-fb-border">
-                <h3 class="font-bold text-sm text-white flex items-center gap-2"><i class="fa-solid fa-gear text-blue-400"></i> Deerbook Settings</h3>
-                <button onclick="closeModal('settings-modal')" class="text-fb-secondary hover:text-white" aria-label="Close"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <div class="space-y-3 text-xs">
-                <div id="settings-account-block" class="fb-card p-3 space-y-1">
-                    <div class="font-bold text-fb-secondary text-[11px] uppercase">Your Account</div>
-                    <div class="text-white font-semibold" id="settings-display-name">—</div>
-                    <div class="text-fb-secondary" id="settings-camp-name">—</div>
-                    <button onclick="signOut()" class="mt-2 text-red-400 hover:text-red-300 text-[11px] font-semibold">Sign out & switch account</button>
-                </div>
-                <hr class="border-fb-border">
-                <div class="fb-card p-3 space-y-2">
-                    <div class="font-bold text-fb-secondary text-[11px] uppercase flex items-center gap-1.5"><i class="fa-solid fa-bell"></i> Push Notifications</div>
-                    <p class="text-gray-300 text-[11px]">Get alerts for new Messenger messages even when Deerbook is in the background.</p>
-                    <div class="flex items-center justify-between gap-2">
-                        <span class="text-fb-secondary" id="notif-status">Checking…</span>
-                        <button onclick="enableNotifications()" id="notif-enable-btn" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-3 py-1.5 rounded-xl text-[11px] font-bold shadow">Enable</button>
-                    </div>
-                    <button onclick="testNotification()" class="w-full fb-input hover:bg-fb-hover py-1.5 rounded-xl text-[11px] font-semibold text-fb-secondary">Send test notification</button>
-                </div>
-                <hr class="border-fb-border">
-                <p class="text-gray-300">Enter your Google Gemini API key to power the AI scout and weather search grounding. Get a free key at <a href="[https://aistudio.google.com/apikey](https://aistudio.google.com/apikey)" target="_blank" rel="noopener" class="text-blue-400 underline">Google AI Studio</a>.</p>
-                <div>
-                    <label class="block text-fb-secondary mb-1" for="api-key-input">Gemini API Key</label>
-                    <input type="password" id="api-key-input" placeholder="AIzaSy..." class="w-full fb-input rounded-xl px-3 py-2" autocomplete="off">
-                </div>
-                <button onclick="saveApiKey()" class="w-full bg-[#1877f2] hover:bg-[#166fe5] text-white font-bold py-2.5 rounded-xl shadow">Save Configuration</button>
-            </div>
-        </div>
+    <label class="flex flex-col items-center justify-center h-32 border-2 border-dashed border-fb-border rounded-xl cursor-pointer hover:border-fb-primary">
+      <i class="fa-solid fa-camera text-2xl text-fb-secondary mb-2"></i>
+      <span class="text-sm text-fb-secondary">Choose Photo</span>
+      <input type="file" id="story-file" accept="image/*" class="hidden" onchange="handleStoryPhoto(event)">
+    </label>
+    <input id="story-caption-input" type="text" placeholder="Add a caption (optional)" class="w-full bg-fb-hover border border-fb-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fb-primary">
+    <div class="flex gap-2">
+      <button onclick="closeStoryUpload()" class="flex-1 bg-fb-hover py-2 rounded-lg text-sm">Cancel</button>
+      <button onclick="publishStory()" class="flex-1 bg-fb-primary hover:bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold">Share to Story</button>
     </div>
+  </div>
+</div>
 
-    <!-- JOIN / REGISTER MODAL (required for free account) -->
-    <div id="join-modal" class="fixed inset-0 z-[4000] bg-black/90 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="fb-card w-full max-w-md rounded-2xl p-6 space-y-5 shadow-2xl">
-            <div class="text-center space-y-2">
-                <img src="data:image/png;base64,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G+2TfNpfyef9lQxlOgnw+LprSU96TisEvsp5wU7m+AGOMpeMRkkcIdJ0HU1WaYYBoogBDPU/8SpJUJ6gfUk1ycwwE53eNQix83S3e9YsKCBAe9Hi8dQqJd5ySQvLOtvw4rnjsaOUfQYhKWaMf8/xAMlU8Ujz343AIU3/lqKVMwGKEJITKFOjoAmuKgR4coFfx0J+YWSnKWV4gWvWOTa203f56R7r+lKqJc2gWv9p0j6wXwXhLz6Gz13wJvL6N9lPevl00W9YkXnZfH4L3eH2oDqV0bX0nOesB/o/z9x/4t76L2r2r+7Zz313aN8b+p3r/70P6XvR24v26k5P9uJpX5eO8r73r5N/wX21415f33Xy0J/97PZ4J//a9/0S3D8f4N28b/7t659/u4D9f7/f0Pz2X6n4O9F/n7D//+d7w/u+v01v5tF/aM5d67y7/v37t9z8H409+f4M73+1Tf3wz2v9Pq5+5Z/28r3jK9u871h/XfcfX7T9N21+dM0ff5ZzL2eP1972b9+R74ff+32+r97v8tA6T+z8f46b//d78Afdz/96rX6Y/f//4Xv57u3aef/5s6P+/2P63z+4u39T1+/73/93/9/z/D3P+8H73/7Wv0//Ojv/2t+x+/53v/+z8Xf//P9//u//39P9j//+/2r73/3z/vv/699f13v//wP2n/8v//9P7//v+8///b///rf/9/3v/+//v//vr7/+///b7/e9v8v7z9n/v///t//+//vt/4r7//3+9/f///wAA//8DAF01H9tN4a1CAAAAAElFTkSuQmCC" alt="DeerBook" class="db-logo-img" width="40" height="40" style="width:40px;height:40px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.3);display:block;"/>
-                <span class="db-wordmark hidden sm:inline">Deer<span>Book</span></span>
-            </div>
-            <div class="text-center space-y-1">
-                <h2 class="text-lg font-bold text-white">Join Deerbook</h2>
-                <p class="text-xs text-fb-secondary">The Hunter's Social Network & Topo Mapping Suite</p>
-            </div>
-            <div class="space-y-3 text-xs">
-                <div>
-                    <label class="block text-fb-secondary mb-1" for="join-name-input">Your Name or Call Sign</label>
-                    <input type="text" id="join-name-input" placeholder="e.g. RidgeRunner" class="w-full fb-input rounded-xl px-3 py-2">
-                </div>
-                <div>
-                    <label class="block text-fb-secondary mb-1" for="join-camp-input">Hunting Camp / Group Name</label>
-                    <input type="text" id="join-camp-input" placeholder="e.g. North Mountain Camp" class="w-full fb-input rounded-xl px-3 py-2">
-                </div>
-                <button onclick="completeJoin()" class="w-full bg-[#1877f2] hover:bg-[#166fe5] text-white font-bold py-2.5 rounded-xl shadow transition">Enter Deerbook</button>
-            </div>
-        </div>
+<!-- New Chat Modal -->
+<div id="new-chat-modal" class="fixed inset-0 z-[5500] bg-black/80 hidden flex items-center justify-center p-4">
+  <div class="bg-fb-card rounded-xl w-full max-w-sm p-5 space-y-4">
+    <h3 class="font-bold text-lg">Start New Chat</h3>
+    <input id="new-chat-email" type="text" placeholder="Enter hunter's email or name" class="w-full bg-fb-hover border border-fb-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fb-primary">
+    <p class="text-xs text-fb-secondary">Enter any name to create a chat thread.</p>
+    <div class="flex gap-2">
+      <button onclick="closeNewChat()" class="flex-1 bg-fb-hover py-2 rounded-lg text-sm">Cancel</button>
+      <button onclick="createChat()" class="flex-1 bg-fb-primary hover:bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold">Start Chat</button>
     </div>
-
-    <!-- Leaflet JS -->
-    <script src="[https://unpkg.com/leaflet@1.9.4/dist/leaflet.js](https://unpkg.com/leaflet@1.9.4/dist/leaflet.js)" crossorigin=""></script>
-    <!-- App Logic Script -->
-    <script type="module">
-        import { GoogleGenAI } from "@google/genai";
-        import { initializeApp } from "firebase/app";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, setDoc, getDoc, updateDoc, increment } from "firebase/firestore";
-
-        // Global state & references
-        let map, userMarker;
-        let waypoints = [];
-        let posts = [];
-        let currentUser = { name: "Camp Hunter", camp: "Nova Scotia Camp", id: 'user_' + Math.random().toString(36.25).substr(2, 9) };
-        let activeTab = 'feed';
-        let customApiKey = localStorage.getItem('deerbook_gemini_key') || '';
-        let currentPhotoBase64 = null;
-        let db = null;
-        let firebaseConfig = null;
-        let renderer, scene, camera, terrainMesh;
-        let isDragging = false, previousMousePosition = { x: 0, y: 0 };
-        let chatConversations = [];
-        let activeChatPeer = null;
-
-        window.addEventListener('DOMContentLoaded', async () => {
-            // Check stored user profile
-            const savedUser = localStorage.getItem('deerbook_user');
-            if (savedUser) {
-                try { currentUser = JSON.parse(savedUser); } catch(e){}
-            } else {
-                document.getElementById('join-modal').classList.remove('hidden');
-            }
-            updateUserInterface();
-
-            // Setup share link
-            document.getElementById('share-link-box').value = window.location.href.split('?')[0];
-
-            // Init Firebase config fetch if available or run standalone
-            initFirebaseAndApp();
-
-            // Init Leaflet Map
-            initMap();
-
-            // Init 3D Terrain
-            init3D();
-
-            // Init Weather & Feed
-            fetchLiveWeather();
-            loadPostsStream();
-        });
-
-        function updateUserInterface() {
-            document.getElementById('sidebar-user-name').textContent = currentUser.name;
-            document.getElementById('post-author-input').value = currentUser.name;
-            const initials = currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase().substr(0,2) || 'H';
-            document.getElementById('sidebar-avatar').textContent = initials;
-            document.getElementById('post-avatar').textContent = initials;
-            document.getElementById('settings-display-name').textContent = currentUser.name;
-            document.getElementById('settings-camp-name').textContent = currentUser.camp;
-        }
-
-        window.completeJoin = function() {
-            const name = document.getElementById('join-name-input').value.trim();
-            const camp = document.getElementById('join-camp-input').value.trim();
-            if(name) currentUser.name = name;
-            if(camp) currentUser.camp = camp;
-            localStorage.setItem('deerbook_user', JSON.stringify(currentUser));
-            document.getElementById('join-modal').classList.add('hidden');
-            updateUserInterface();
-            if(db) saveOnlinePresence();
-        };
-
-        window.signOut = function() {
-            localStorage.removeItem('deerbook_user');
-            location.reload();
-        };
-
-        window.openModal = function(id) {
-            document.getElementById(id).classList.remove('hidden');
-            if(id === 'settings-modal') {
-                document.getElementById('api-key-input').value = customApiKey;
-                checkNotificationPermissionStatus();
-            }
-        };
-
-        window.closeModal = function(id) {
-            document.getElementById(id).classList.add('hidden');
-        };
-
-        window.switchTab = function(tab) {
-            activeTab = tab;
-            const tabs = ['feed', 'map', 'terrain3d', 'ai', 'messenger'];
-            tabs.forEach(t => {
-                const el = document.getElementById('view-' + t);
-                const btn = document.getElementById('nav-tab-' + t);
-                if(t === tab) {
-                    el.classList.remove('hidden');
-                    btn.classList.add('text-[#1877f2]', 'border-b-4', 'border-[#1877f2]');
-                    btn.classList.remove('text-fb-secondary');
-                } else {
-                    el.classList.add('hidden');
-                    btn.classList.remove('text-[#1877f2]', 'border-b-4', 'border-[#1877f2]');
-                    btn.classList.add('text-fb-secondary');
-                }
-            });
-            if(tab === 'map' && map) {
-                setTimeout(() => map.invalidateSize(), 200);
-            }
-            if(tab === 'terrain3d') {
-                setTimeout(() => {
-                    if(renderer) {
-                        const container = document.getElementById('canvas-3d-container');
-                        renderer.setSize(container.clientWidth, container.clientHeight);
-                        camera.aspect = container.clientWidth / container.clientHeight;
-                        camera.updateProjectionMatrix();
-                    }
-                }, 200);
-            }
-        };
-
-        // --- MAP FUNCTIONS ---
-        function initMap() {
-            // Centered near Nova Scotia (Oxford / North Mountain region)
-            map = L.map('map', { zoomControl: false }).setView([45.72, -63.58], 13);
-            L.control.zoom({ position: 'bottomright' }).addTof(map);
-
-            // Topo / Outdoor tile layer
-            L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                maxZoom: 17,
-                attribution: 'Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)'
-            }).addTo(map);
-
-            map.on('click', (e) => {
-                // Quick waypoint drop on click if desired
-            });
-        }
-
-        window.panGPS = function() {
-            if(navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(pos => {
-                    const lat = pos.coords.latitude;
-                    const lon = pos.coords.longitude;
-                    map.setView([lat, lon], 15);
-                    if(userMarker) map.removeLayer(userMarker);
-                    userMarker = L.marker([lat, lon]).addTo(map).bindPopup("<b>Your GPS Location</b><br>Accuracy: " + Math.round(pos.coords.accuracy) + "m").openPopup();
-                }, err => {
-                    alert("Unable to retrieve your GPS location.");
-                });
-            } else {
-                alert("Geolocation is not supported by your browser.");
-            }
-        };
-
-        window.dropWaypoint = function() {
-            const center = map.getCenter();
-            const name = prompt("Enter waypoint name (e.g. Buck Rub, Active Scrap, Tree Stand):", "Camp Stand");
-            if(!name) return;
-            const marker = L.marker([center.lat, center.lng]).addTo(map)
-                .bindPopup(`<b>${name}</b><br>Lat: ${center.lat.toFixed(4)}, Lon: ${center.lng.toFixed(4)}<br><span class="text-xs text-blue-400">Pinned by ${currentUser.name}</span>`);
-            waypoints.push({ name, lat: center.lat, lng: center.lng });
-            marker.openPopup();
-        };
-
-        // --- 3D TERRAIN RENDERER (THREE.JS) ---
-        function init3D() {
-            const container = document.getElementById('canvas-3d-container');
-            if(!container) return;
-
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x111213);
-
-            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-            camera.position.set(0, 45, 60);
-            camera.lookAt(0, 0, 0);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            container.appendChild(renderer.domElement);
-
-            // Lighting for terrain shading
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-            scene.add(ambientLight);
-
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight.position.set(50, 100, 50);
-            scene.add(dirLight);
-
-            // Generate procedural Topo terrain mesh representing a Nova Scotia ridge/saddle
-            const geometry = new THREE.PlaneGeometry(60, 60, 40, 40);
-            geometry.rotateX(-Math.PI / 2);
-
-            const posAttr = geometry.attributes.position;
-            for(let i = 0; i < posAttr.count; i++) {
-                const x = posAttr.getX(i);
-                const z = posAttr.getZ(i);
-                // Create rolling hills / ridge line with a saddle in the middle
-                const y = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 8 + Math.cos(x * 0.05) * 4;
-                posAttr.setY(i, y);
-            }
-            geometry.computeVertexNormals();
-
-            const material = new THREE.MeshStandardMaterial({
-                color: 0x2e5a36,
-                roughness: 0.8,
-                metalness: 0.1,
-                wireframe: false
-            });
-
-            terrainMesh = new THREE.Mesh(geometry, material);
-            scene.add(terrainMesh);
-
-            // Mouse controls for rotation
-            container.addEventListener('mousedown', (e) => {
-                isDragging = true;
-                previousMousePosition = { x: e.clientX, y: e.clientY };
-            });
-            window.addEventListener('mousemove', (e) => {
-                if(!isDragging) return;
-                const deltaX = e.clientX - previousMousePosition.x;
-                const deltaY = e.clientY - previousMousePosition.y;
-
-                terrainMesh.rotation.y += deltaX * 0.005;
-                terrainMesh.rotation.x += deltaY * 0.005;
-
-                previousMousePosition = { x: e.clientX, y: e.clientY };
-            });
-            window.addEventListener('mouseup', () => { isDragging = false; });
-
-            container.addEventListener('wheel', (e) => {
-                camera.position.z += e.deltaY * 0.05;
-                camera.position.z = Math.max(20, Math.min(120, camera.position.z));
-            });
-
-            animate3D();
-        }
-
-        function animate3D() {
-            requestAnimationFrame(animate3D);
-            if(renderer && scene && camera) {
-                renderer.render(scene, camera);
-            }
-        }
-
-        window.runTerrainAI = async function() {
-            const box = document.getElementById('terrain-ai-box');
-            box.innerHTML = `<span class="text-blue-400 font-bold">Deerbook AI Scout:</span> Analyzing ridge lines, thermal cover, and saddle pinch-points...`;
-            
-            const apiKey = customApiKey || prompt("Enter your Gemini API key for AI Terrain Analysis:");
-            if(!apiKey) {
-                box.innerHTML = `<span class="text-red-400 font-bold">API Key required</span> for advanced AI analysis.`;
-                return;
-            }
-
-            try {
-                const ai = new GoogleGenAI({ apiKey });
-                const response = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: 'Analyze white-tailed deer movement patterns across a Nova Scotia wooded ridge with a central saddle feature during the November rut. Give 3 concise, highly actionable tactical scouting recommendations for tree stand placement in bullet points.',
-                });
-                box.innerHTML = `<div class="font-bold text-blue-400 mb-1">Deerbook AI Topo Analysis:</div><div class="space-y-1">${response.text.replace(/\n/g, '<br>')}</div>`;
-            } catch(err) {
-                box.innerHTML = `<span class="text-red-400 font-bold">Error:</span> ${err.message}`;
-            }
-        };
-
-        // --- FIREBASE & BACKEND SYNC ---
-        async function initFirebaseAndApp() {
-            // Attempt to load firebase config if hosted or use default fallback storage demo
-            try {
-                const res = await fetch('/__firebase/config.json');
-                if(res.ok) {
-                    firebaseConfig = await res.json();
-                    const app = initializeApp(firebaseConfig);
-                    db = getFirestore(app);
-                    initFirestoreSync();
-                    return;
-                }
-            } catch(e){}
-
-            // Fallback to local simulation if no server firebase backend attached
-            loadLocalDemoPosts();
-        }
-
-        function loadLocalDemoPosts() {
-            posts = [
-                { id: 'p1', author: 'RidgeRunner NS', camp: 'Fundy Camp', text: 'Fresh 8-pointer rubs found along the cedar swamp edge this morning! The pre-rut is kicking off hard with this frost.', time: '2 hours ago', likes: ['Camp Hunter'], comments: [{author: 'BuckMaster', text: 'Absolute hammer! What elevation were you at?'}] },
-                { id: 'p2', author: 'Nova Scotia Hunter', camp: 'North Mountain', text: 'Gorgeous sunrise from the ladder stand. Wind is coming out of the NW, perfect thermal current sliding down into the valley.', time: '5 hours ago', likes: [], comments: [] }
-            ];
-            renderPosts();
-        }
-
-        function initFirestoreSync() {
-            if(!db) return;
-            const q = query(collection(db, "deerbook_posts"), orderBy("timestamp", "desc"));
-            onSnapshot(q, (snapshot) => {
-                posts = [];
-                snapshot.forEach((doc) => {
-                    posts.push({ id: doc.id, ...doc.data() });
-                });
-                renderPosts();
-            });
-            saveOnlinePresence();
-        }
-
-        async function saveOnlinePresence() {
-            if(!db) return;
-            try {
-                await setDoc(doc(db, "deerbook_online", currentUser.id), {
-                    name: currentUser.name,
-                    camp: currentUser.camp,
-                    lastSeen: new Date()
-                }, { merge: true });
-
-                // Listen for online users
-                onSnapshot(collection(db, "deerbook_online"), (snapshot) => {
-                    let html = '';
-                    snapshot.forEach(d => {
-                        const data = d.data();
-                        html += `<div class="flex items-center justify-between p-1 rounded hover:bg-fb-hover">
-                            <span class="font-semibold text-white">${data.name}</span>
-                            <span class="text-[10px] text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-circle text-[6px]"></i> Online</span>
-                        </div>`;
-                    });
-                    document.getElementById('online-crew').innerHTML = html || '<div class="text-fb-secondary">No other hunters online</div>';
-                });
-            } catch(e){}
-        }
-
-        // --- POSTS & FEED ---
-        window.handlePhoto = function(event) {
-            const file = event.target.files[0];
-            if(file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    currentPhotoBase64 = e.target.result;
-                    document.getElementById('photo-label').textContent = "Photo Attached ✓";
-                };
-                reader.readAsDataURL(file);
-            }
-        };
-
-        window.submitPost = async function() {
-            const text = document.getElementById('post-text-input').value.trim();
-            if(!text && !currentPhotoBase64) {
-                alert("Please write something or attach a photo for your camp post.");
-                return;
-            }
-
-            const newPost = {
-                author: currentUser.name,
-                camp: currentUser.camp,
-                text: text,
-                photo: currentPhotoBase64 || null,
-                time: 'Just now',
-                timestamp: Date.now(),
-                likes: [],
-                comments: []
-            };
-
-            if(db) {
-                try {
-                    await addDoc(collection(db, "deerbook_posts"), newPost);
-                } catch(e) {
-                    posts.unshift(newPost);
-                    renderPosts();
-                }
-            } else {
-                posts.unshift(newPost);
-                renderPosts();
-            }
-
-            document.getElementById('post-text-input').value = '';
-            document.getElementById('post-file-input').value = '';
-            currentPhotoBase64 = null;
-            document.getElementById('photo-label').textContent = "Attach Photo";
-        };
-
-        function renderPosts() {
-            const container = document.getElementById('posts-stream');
-            if(posts.length === 0) {
-                container.innerHTML = `<div class="text-center py-10 text-fb-secondary text-xs">No posts yet. Be the first to share a sighting!</div>`;
-                return;
-            }
-
-            let html = '';
-            posts.forEach((p, idx) => {
-                const initials = p.author ? p.author.split(' ').map(n => n[0]).join('').toUpperCase().substr(0,2) : 'H';
-                const isLiked = p.likes && p.likes.includes(currentUser.name);
-                const likeCount = p.likes ? p.likes.length : 0;
-                const comments = p.comments || [];
-
-                html += `
-                <div class="fb-card p-4 space-y-3 shadow-md">
-                    <!-- Post Header -->
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-full bg-[#1877f2] flex items-center justify-center font-bold text-white text-xs">${initials}</div>
-                            <div>
-                                <div class="font-bold text-xs text-white">${p.author} <span class="text-[10px] font-normal text-fb-secondary">(${p.camp || 'Camp Crew'})</span></div>
-                                <div class="text-[10px] text-fb-secondary">${p.time || 'Recently'}</div>
-                            </div>
-                        </div>
-                        <button onclick="openMessageWith('${p.author}')" class="text-fb-secondary hover:text-blue-400 text-xs" title="Message hunter" aria-label="Message hunter"><i class="fa-brands fa-facebook-messenger text-base"></i></button>
-                    </div>
-                    <!-- Post Body -->
-                    <div class="text-xs text-gray-200 whitespace-pre-line">${p.text || ''}</div>
-                    ${p.photo ? `<div class="rounded-xl overflow-hidden max-h-96 bg-black flex items-center justify-center"><img src="${p.photo}" class="object-cover w-full max-h-96" alt="Post photo"></div>` : ''}
-                    
-                    <!-- Like & Comment Counts -->
-                    <div class="flex items-center justify-between text-[11px] text-fb-secondary pt-1 border-t border-fb-border">
-                        <div><span id="like-count-${idx}">${likeCount}</span> likes</div>
-                        <div><span id="comment-count-${idx}">${comments.length}</span> comments</div>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="grid grid-cols-2 gap-1 pt-1 border-t border-fb-border">
-                        <button onclick="toggleLike(${idx})" id="like-btn-${idx}" class="py-1.5 rounded-lg hover:bg-fb-hover text-xs font-semibold flex items-center justify-center gap-1.5 ${isLiked ? 'like-active' : 'text-fb-secondary'}">
-                            <i class="fa-solid fa-thumbs-up"></i> Like
-                        </button>
-                        <button onclick="toggleCommentBox(${idx})" class="py-1.5 rounded-lg hover:bg-fb-hover text-xs font-semibold text-fb-secondary flex items-center justify-center gap-1.5">
-                            <i class="fa-solid fa-comment"></i> Comment
-                        </button>
-                    </div>
-
-                    <!-- Comment Drawer -->
-                    <div id="comment-box-${idx}" class="comment-box space-y-2 pt-2 border-t border-fb-border">
-                        <div id="comments-list-${idx}" class="space-y-1.5 max-h-32 overflow-y-auto text-xs">
-                            ${comments.map(c => `<div class="bg-fb-input p-2 rounded-xl"><b>${c.author}:</b>${c.text}</div>`).join('')}
-                        </div>
-                        <div class="flex gap-2">
-                            <input type="text" id="comment-input-${idx}" placeholder="Write a comment..." class="flex-1 fb-input rounded-full px-3 py-1.5 text-xs" onkeydown="if(event.key==='Enter')submitComment(${idx})">
-                            <button onclick="submitComment(${idx})" class="bg-[#1877f2] hover:bg-[#166fe5] text-white px-3 py-1.5 rounded-xl text-xs font-bold">Reply</button>
-                        </div>
-                    </div>
-                </div>`;
-            });
-            container.innerHTML = html;
-        }
-
-        window.toggleLike = function(idx) {
-            const p = posts[idx];
-            if(!p.likes) p.likes = [];
-            const pos = p.likes.indexOf(currentUser.name);
-            if(pos >= 0) {
-                p.likes.splice(pos, 1);
-            } else {
-                p.likes.push(currentUser.name);
-            }
-            renderPosts();
-        };
-
-        window.toggleCommentBox = function(idx) {
-            const box = document.getElementById(`comment-box-${idx}`);
-            box.classList.toggle('open');
-        };
-
-        window.submitComment = function(idx) {
-            const input = document.getElementById(`comment-input-${idx}`);
-            const val = input.value.trim();
-            if(!val) return;
-            if(!posts[idx].comments) posts[idx].comments = [];
-            posts[idx].comments.push({ author: currentUser.name, text: val });
-            input.value = '';
-            renderPosts();
-            document.getElementById(`comment-box-${idx}`).classList.add('open');
-        };
-
-        // --- WEATHER GROUNDING ---
-        async function fetchLiveWeather() {
-            const widget = document.getElementById('weather-widget');
-            // Use Gemini with Google Search grounding for accurate live weather in Nova Scotia
-            const apiKey = customApiKey;
-            if(!apiKey) {
-                widget.innerHTML = `<div>Oxford, NS: 8°C, Partly Cloudy</div><div class="text-[10px] text-fb-secondary">Wind: NW 14 km/h</div><div class="text-[10px] text-blue-400 mt-1">Add Gemini key in Settings for live weather grounding.</div>`;
-                return;
-            }
-
-            try {
-                const ai = new GoogleGenAI({ apiKey });
-                const response = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: 'What is the current live weather and wind condition in Oxford, Nova Scotia right now?',
-                    config: { tools: [{ googleSearch: {} }] }
-                });
-                widget.innerHTML = `<div class="text-white">${response.text}</div>`;
-            } catch(err) {
-                widget.innerHTML = `<div>Oxford, NS: 8°C, Wind NW 14 km/h</div>`;
-            }
-        }
-
-        // --- GEMINI AI SCOUT CHAT ---
-        window.sendAiMessage = async function() {
-            const input = document.getElementById('ai-input');
-            const msg = input.value.trim();
-            if(!msg) return;
-
-            const chatMessages = document.getElementById('ai-chat-messages');
-            chatMessages.innerHTML += `
-            <div class="p-3 rounded-xl bg-fb-card border border-fb-border max-w-[85%] ml-auto text-right">
-                <div class="font-bold text-blue-400 mb-1">You</div>
-                <div>${msg}</div>
-            </div>`;
-            input.value = '';
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-
-            const apiKey = customApiKey || prompt("Enter your Gemini API key for AI Scout:");
-            if(!apiKey) {
-                chatMessages.innerHTML += `<div class="p-3 rounded-xl bg-red-950/60 border border-red-900/50 text-red-300">API Key required for AI Scout.</div>`;
-                return;
-            }
-
-            const loadingId = 'ai-loading-' + Date.now();
-            chatMessages.innerHTML += `
-            <div id="${loadingId}" class="p-3 rounded-xl bg-blue-950/60 border border-blue-900/50 max-w-[85%]">
-                <div class="font-bold text-blue-400 mb-1">Deerbook AI</div>
-                <div>Scouting woods and regulations...</div>
-            </div>`;
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-
-            try {
-                const ai = new GoogleGenAI({ apiKey });
-                const response = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: `You are Deerbook AI, an expert white-tailed deer hunting guide and wildlife biologist specializing in Nova Scotia forests and deer behavior. Answer this hunter's question: ${msg}`,
-                    config: { tools: [{ googleSearch: {} }] }
-                });
-                document.getElementById(loadingId).innerHTML = `
-                <div class="font-bold text-blue-400 mb-1">Deerbook AI</div>
-                <div>${response.text.replace(/\n/g, '<br>')}</div>`;
-            } catch(err) {
-                document.getElementById(loadingId).innerHTML = `
-                <div class="font-bold text-red-400 mb-1">Deerbook AI</div>
-                <div>Error: ${err.message}</div>`;
-            }
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        };
-
-        window.handleAiKey = function(e) {
-            if(e.key === 'Enter') sendAiMessage();
-        };
-
-        // --- MESSENGER ---
-        window.openMessageWith = function(peerName) {
-            switchTab('messenger');
-            let conv = chatConversations.find(c => c.peer === peerName);
-            if(!conv) {
-                conv = { peer: peerName, messages: [] };
-                chatConversations.push(conv);
-            }
-            activeChatPeer = conv;
-            renderConversations();
-            openActiveChat(conv);
-        };
-
-        window.startNewChat = function() {
-            const peer = prompt("Enter hunter name to message:");
-            if(!peer) return;
-            openMessageWith(peer);
-        };
-
-        window.renderConversations = function() {
-            const search = (document.getElementById('msg-search').value || '').toLowerCase();
-            const container = document.getElementById('msg-conversations');
-            const filtered = chatConversations.filter(c => c.peer.toLowerCase().includes(search));
-
-            if(filtered.length === 0) {
-                container.innerHTML = `<div class="p-4 text-center text-fb-secondary text-xs">No conversations</div>`;
-                return;
-            }
-
-            let html = '';
-            filtered.forEach(c => {
-                const lastMsg = c.messages.length > 0 ? c.messages[c.messages.length - 1].text : 'Started conversation';
-                const initials = c.peer.split(' ').map(n => n[0]).join('').toUpperCase().substr(0,2);
-                const isActive = activeChatPeer && activeChatPeer.peer === c.peer;
-                html += `
-                <div onclick="selectChat('${c.peer}')" class="flex items-center gap-3 p-3 cursor-pointer hover:bg-fb-hover transition ${isActive ? 'bg-fb-hover' : ''}">
-                    <div class="w-10 h-10 rounded-full bg-[#1877f2] flex items-center justify-center font-bold text-white text-xs shrink-0">${initials}</div>
-                    <div class="overflow-hidden">
-                        <div class="font-bold text-xs text-white">${c.peer}</div>
-                        <div class="text-[11px] text-fb-secondary truncate">${lastMsg}</div>
-                    </div>
-                </div>`;
-            });
-            container.innerHTML = html;
-        };
-
-        window.selectChat = function(peerName) {
-            const conv = chatConversations.find(c => c.peer === peerName);
-            if(conv) {
-                activeChatPeer = conv;
-                renderConversations();
-                openActiveChat(conv);
-            }
-        };
-
-        function openActiveChat(conv) {
-            document.getElementById('msg-chat-empty').classList.add('hidden');
-            document.getElementById('msg-chat-active').classList.remove('hidden');
-            document.getElementById('msg-peer-name').textContent = conv.peer;
-            document.getElementById('msg-peer-avatar').textContent = conv.peer.split(' ').map(n => n[0]).join('').toUpperCase().substr(0,2);
-
-            const thread = document.getElementById('msg-thread');
-            let html = '';
-            conv.messages.forEach(m => {
-                const isMe = m.sender === currentUser.name;
-                html += `
-                <div class="flex ${isMe ? 'justify-end' : 'justify-start'}">
-                    <div class="max-w-[75%] px-3 py-2 rounded-2xl text-xs ${isMe ? 'bg-[#1877f2] text-white' : 'bg-fb-card text-gray-200 border border-fb-border'}">
-                        ${m.text}
-                    </div>
-                </div>`;
-            });
-            thread.innerHTML = html;
-            thread.scrollTop = thread.scrollHeight;
-
-            // On mobile, hide list panel when chat is open
-            if(window.innerWidth < 640) {
-                document.getElementById('msg-list-panel').classList.add('hidden');
-            }
-        }
-
-        window.backToMsgList = function() {
-            document.getElementById('msg-list-panel').classList.remove('hidden');
-            document.getElementById('msg-chat-active').classList.add('hidden');
-            document.getElementById('msg-chat-empty').classList.remove('hidden');
-        };
-
-        window.sendMessage = function() {
-            const input = document.getElementById('msg-input');
-            const val = input.value.trim();
-            if(!val || !activeChatPeer) return;
-
-            activeChatPeer.messages.push({ sender: currentUser.name, text: val, time: Date.now() });
-            input.value = '';
-            openActiveChat(activeChatPeer);
-            renderConversations();
-
-            // Simulate reply from camp partner for realism
-            setTimeout(() => {
-                activeChatPeer.messages.push({ sender: activeChatPeer.peer, text: 'Copy that! Good luck out there, stay safe.', time: Date.now() });
-                openActiveChat(activeChatPeer);
-                renderConversations();
-                showNotificationBadge();
-            }, 1500);
-        };
-
-        function showNotificationBadge() {
-            const badge = document.getElementById('msg-badge');
-            badge.classList.remove('hidden');
-            badge.textContent = parseInt(badge.textContent || '0') + 1;
-            
-            if("Notification" in window && Notification.permission === "granted") {
-                new Notification("Deerbook Messenger", { body: "New message from camp partner" });
-            }
-        }
-
-        // --- SETTINGS & NOTIFICATIONS ---
-        window.saveApiKey = function() {
-            const key = document.getElementById('api-key-input').value.trim();
-            customApiKey = key;
-            localStorage.setItem('deerbook_gemini_key', key);
-            alert("API Key saved successfully!");
-            closeModal('settings-modal');
-            fetchLiveWeather();
-        };
-
-        function checkNotificationPermissionStatus() {
-            const statusEl = document.getElementById('notif-status');
-            if(!("Notification" in window)) {
-                statusEl.textContent = "Not supported";
-                return;
-            }
-            if(Notification.permission === "granted") {
-                statusEl.textContent = "Enabled ✓";
-                document.getElementById('notif-enable-btn').classList.add('hidden');
-            } else if(Notification.permission === "denied") {
-                statusEl.textContent = "Blocked";
-            } else {
-                statusEl.textContent = "Disabled";
-            }
-        }
-
-        window.enableNotifications = async function() {
-            if(!("Notification" in window)) {
-                alert("Notifications not supported in this browser.");
-                return;
-            }
-            const perm = await Notification.requestPermission();
-            checkNotificationPermissionStatus();
-            if(perm === "granted") {
-                new Notification("Deerbook", { body: "Notifications enabled! You will now receive camp alerts." });
-            }
-        };
-
-        window.testNotification = function() {
-            if("Notification" in window && Notification.permission === "granted") {
-                new Notification("Deerbook Camp Alert", { body: "Big buck sighted near North Mountain ridge stand!" });
-            } else {
-                alert("Please enable notifications first.");
-            }
-        };
-
-        window.copyLink = function() {
-            const box = document.getElementById('share-link-box');
-            box.select();
-            navigator.clipboard.writeText(box.value);
-            alert("Camp invite link copied to clipboard!");
-        };
-    </script>
+  </div>
+</div>
+
+<script>
+const LOGO_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAA...PLACEHOLDER...";
+
+let currentUser = null;
+let posts = [];
+let stories = [];
+let conversations = [];
+let activeChatId = null;
+let currentPostPhoto = null;
+let currentStoryPhoto = null;
+let storyViewerTimer = null;
+let storyProgress = 0;
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).substr(2,6); }
+function now(){ return Date.now(); }
+function timeAgo(ts){
+  const s = Math.floor((Date.now()-ts)/1000);
+  if(s<60) return 'just now';
+  if(s<3600) return Math.floor(s/60)+'m';
+  if(s<86400) return Math.floor(s/3600)+'h';
+  return Math.floor(s/86400)+'d';
+}
+function initials(name){ return (name||'H').split(' ').map(n=>n[0]).join('').toUpperCase().substr(0,2); }
+function hash(str){
+  let h=0; for(let i=0;i<str.length;i++){ h=((h<<5)-h)+str.charCodeAt(i); h|=0; }
+  return 'h'+Math.abs(h).toString(16);
+}
+function save(key, val){ localStorage.setItem('db_'+key, JSON.stringify(val)); }
+function load(key, def){ try{ return JSON.parse(localStorage.getItem('db_'+key)) || def; }catch(e){ return def; } }
+
+function showLogin(){
+  document.getElementById('login-form').classList.remove('hidden');
+  document.getElementById('register-form').classList.add('hidden');
+  document.getElementById('login-error').classList.add('hidden');
+}
+function showRegister(){
+  document.getElementById('login-form').classList.add('hidden');
+  document.getElementById('register-form').classList.remove('hidden');
+  document.getElementById('reg-error').classList.add('hidden');
+}
+
+function handleRegister(){
+  const name = document.getElementById('reg-name').value.trim();
+  const camp = document.getElementById('reg-camp').value.trim() || 'Camp';
+  const email = document.getElementById('reg-email').value.trim().toLowerCase();
+  const pass = document.getElementById('reg-password').value;
+  const err = document.getElementById('reg-error');
+  if(!name || !email || pass.length < 6){
+    err.textContent = 'Name, email and password (6+ chars) are required.';
+    err.classList.remove('hidden'); return;
+  }
+  let users = load('users', {});
+  if(users[email]){
+    err.textContent = 'An account with this email already exists.';
+    err.classList.remove('hidden'); return;
+  }
+  const user = { id: uid(), name, camp, email, passHash: hash(pass), created: now() };
+  users[email] = user;
+  save('users', users);
+  currentUser = { id: user.id, name, camp, email };
+  save('session', currentUser);
+  enterApp();
+}
+
+function handleLogin(){
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  const pass = document.getElementById('login-password').value;
+  const err = document.getElementById('login-error');
+  let users = load('users', {});
+  const user = users[email];
+  if(!user || user.passHash !== hash(pass)){
+    err.textContent = 'Invalid email or password.';
+    err.classList.remove('hidden'); return;
+  }
+  currentUser = { id: user.id, name: user.name, camp: user.camp, email: user.email };
+  save('session', currentUser);
+  enterApp();
+}
+
+function logout(){
+  localStorage.removeItem('db_session');
+  currentUser = null;
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('auth-screen').classList.remove('hidden');
+  showLogin();
+}
+
+function enterApp(){
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  updateUI();
+  loadAllData();
+  switchTab('feed');
+}
+
+function updateUI(){
+  if(!currentUser) return;
+  const av = initials(currentUser.name);
+  ['header-avatar','post-avatar','profile-avatar'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el){ el.textContent = av; }
+  });
+  document.getElementById('profile-name').textContent = currentUser.name;
+  document.getElementById('profile-camp').textContent = currentUser.camp;
+  document.getElementById('profile-email').textContent = currentUser.email;
+}
+
+function loadAllData(){
+  posts = load('posts', []);
+  stories = load('stories', []).filter(s => now() - s.created < 24*3600*1000);
+  conversations = load('conversations_'+currentUser.id, []);
+  renderPosts();
+  renderStoriesBar();
+  renderConversations();
+}
+
+function persistPosts(){ save('posts', posts); }
+function persistStories(){ save('stories', stories); }
+function persistConversations(){ save('conversations_'+currentUser.id, conversations); }
+
+function handlePostPhoto(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    currentPostPhoto = ev.target.result;
+    document.getElementById('post-preview-img').src = currentPostPhoto;
+    document.getElementById('post-preview').classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+function clearPostPhoto(){
+  currentPostPhoto = null;
+  document.getElementById('post-preview').classList.add('hidden');
+  document.getElementById('post-file').value = '';
+}
+
+function createPost(){
+  const text = document.getElementById('post-text').value.trim();
+  if(!text && !currentPostPhoto){ alert('Write something or add a photo.'); return; }
+  const post = {
+    id: uid(),
+    authorId: currentUser.id,
+    author: currentUser.name,
+    camp: currentUser.camp,
+    text,
+    photo: currentPostPhoto,
+    likes: [],
+    comments: [],
+    created: now()
+  };
+  posts.unshift(post);
+  persistPosts();
+  document.getElementById('post-text').value = '';
+  clearPostPhoto();
+  renderPosts();
+}
+
+function toggleLike(postId){
+  const p = posts.find(x=>x.id===postId);
+  if(!p) return;
+  const idx = p.likes.indexOf(currentUser.id);
+  if(idx>=0) p.likes.splice(idx,1);
+  else p.likes.push(currentUser.id);
+  persistPosts();
+  renderPosts();
+}
+
+function addComment(postId){
+  const input = document.getElementById('comment-'+postId);
+  const text = input.value.trim();
+  if(!text) return;
+  const p = posts.find(x=>x.id===postId);
+  if(!p) return;
+  p.comments.push({ author: currentUser.name, text, created: now() });
+  persistPosts();
+  input.value = '';
+  renderPosts();
+}
+
+function renderPosts(){
+  const stream = document.getElementById('posts-stream');
+  if(posts.length===0){
+    stream.innerHTML = `<div class="text-center text-fb-secondary py-12 text-sm">No posts yet. Be the first to share a sighting!</div>`;
+    return;
+  }
+  stream.innerHTML = posts.map(p=>{
+    const liked = p.likes.includes(currentUser.id);
+    return `
+    <div class="bg-fb-card rounded-xl border border-fb-border overflow-hidden">
+      <div class="p-3 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-fb-primary flex items-center justify-center font-bold text-white text-sm">${initials(p.author)}</div>
+        <div>
+          <div class="font-semibold text-sm">${p.author}</div>
+          <div class="text-[11px] text-fb-secondary">${p.camp} · ${timeAgo(p.created)}</div>
+        </div>
+      </div>
+      ${p.text ? `<div class="px-3 pb-2 text-sm whitespace-pre-wrap">${p.text}</div>` : ''}
+      ${p.photo ? `<img src="${p.photo}" class="w-full max-h-96 object-cover" alt="post photo">` : ''}
+      <div class="px-3 py-2 flex items-center gap-4 text-sm text-fb-secondary border-t border-fb-border">
+        <button onclick="toggleLike('${p.id}')" class="${liked?'like-active':''}"><i class="fa-solid fa-thumbs-up"></i> ${p.likes.length||''} Like</button>
+        <button onclick="document.getElementById('comments-${p.id}').classList.toggle('hidden')"><i class="fa-solid fa-comment"></i> ${p.comments.length||''} Comment</button>
+      </div>
+      <div id="comments-${p.id}" class="hidden px-3 pb-3 space-y-2 border-t border-fb-border pt-2">
+        ${p.comments.map(c=>`<div class="text-xs"><span class="font-semibold">${c.author}</span> ${c.text}</div>`).join('')}
+        <div class="flex gap-2 mt-2">
+          <input id="comment-${p.id}" type="text" placeholder="Write a comment..." class="flex-1 bg-fb-hover border border-fb-border rounded-full px-3 py-1.5 text-xs focus:outline-none" onkeydown="if(event.key==='Enter')addComment('${p.id}')">
+          <button onclick="addComment('${p.id}')" class="text-fb-primary text-xs font-semibold">Post</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openStoryUpload(){
+  currentStoryPhoto = null;
+  document.getElementById('story-upload-preview').classList.add('hidden');
+  document.getElementById('story-file').value = '';
+  document.getElementById('story-caption-input').value = '';
+  document.getElementById('story-upload-modal').classList.remove('hidden');
+}
+function closeStoryUpload(){ document.getElementById('story-upload-modal').classList.add('hidden'); }
+function handleStoryPhoto(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    currentStoryPhoto = ev.target.result;
+    document.getElementById('story-upload-img').src = currentStoryPhoto;
+    document.getElementById('story-upload-preview').classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+function publishStory(){
+  if(!currentStoryPhoto){ alert('Please choose a photo for your story.'); return; }
+  const caption = document.getElementById('story-caption-input').value.trim();
+  stories.unshift({
+    id: uid(),
+    authorId: currentUser.id,
+    author: currentUser.name,
+    photo: currentStoryPhoto,
+    caption,
+    created: now()
+  });
+  persistStories();
+  closeStoryUpload();
+  renderStoriesBar();
+  switchTab('feed');
+}
+
+function renderStoriesBar(){
+  const list = document.getElementById('stories-list');
+  const byAuthor = {};
+  stories.forEach(s=>{
+    if(!byAuthor[s.authorId] || s.created > byAuthor[s.authorId].created)
+      byAuthor[s.authorId] = s;
+  });
+  list.innerHTML = Object.values(byAuthor).map(s=>`
+    <div class="flex-shrink-0 flex flex-col items-center gap-1 cursor-pointer" onclick="viewStory('${s.id}')">
+      <div class="w-16 h-16 rounded-full p-[3px] story-ring">
+        <div class="w-full h-full rounded-full overflow-hidden bg-fb-card">
+          <img src="${s.photo}" class="w-full h-full object-cover">
+        </div>
+      </div>
+      <span class="text-[11px] text-fb-secondary max-w-[64px] truncate">${s.authorId===currentUser.id?'Your Story':s.author.split(' ')[0]}</span>
+    </div>
+  `).join('');
+}
+
+function viewStory(id){
+  const s = stories.find(x=>x.id===id);
+  if(!s) return;
+  document.getElementById('story-img').src = s.photo;
+  document.getElementById('story-author-name').textContent = s.author;
+  document.getElementById('story-author-avatar').textContent = initials(s.author);
+  document.getElementById('story-time').textContent = timeAgo(s.created);
+  document.getElementById('story-caption').textContent = s.caption || '';
+  document.getElementById('story-viewer').classList.remove('hidden');
+  storyProgress = 0;
+  document.getElementById('story-progress').style.width = '0%';
+  if(storyViewerTimer) clearInterval(storyViewerTimer);
+  storyViewerTimer = setInterval(()=>{
+    storyProgress += 2;
+    document.getElementById('story-progress').style.width = storyProgress+'%';
+    if(storyProgress>=100){ closeStoryViewer(); }
+  }, 100);
+}
+function closeStoryViewer(){
+  document.getElementById('story-viewer').classList.add('hidden');
+  if(storyViewerTimer) clearInterval(storyViewerTimer);
+}
+
+function renderConversations(){
+  const q = (document.getElementById('msg-search').value||'').toLowerCase();
+  const list = document.getElementById('conversations');
+  let filtered = conversations;
+  if(q) filtered = conversations.filter(c => c.peerName.toLowerCase().includes(q));
+  if(filtered.length===0){
+    list.innerHTML = `<div class="p-6 text-center text-fb-secondary text-sm">No chats yet. Start a new conversation!</div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(c=>{
+    const last = c.messages[c.messages.length-1];
+    return `
+    <div onclick="openChat('${c.id}')" class="p-3 flex items-center gap-3 hover:bg-fb-hover cursor-pointer border-b border-fb-border ${activeChatId===c.id?'bg-fb-hover':''}">
+      <div class="w-11 h-11 rounded-full bg-fb-primary flex items-center justify-center font-bold text-white">${initials(c.peerName)}</div>
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-sm truncate">${c.peerName}</div>
+        <div class="text-xs text-fb-secondary truncate">${last?last.text:'No messages yet'}</div>
+      </div>
+      <div class="text-[10px] text-fb-secondary">${last?timeAgo(last.created):''}</div>
+    </div>`;
+  }).join('');
+}
+
+function startNewChat(){
+  document.getElementById('new-chat-email').value = '';
+  document.getElementById('new-chat-modal').classList.remove('hidden');
+}
+function closeNewChat(){ document.getElementById('new-chat-modal').classList.add('hidden'); }
+
+function createChat(){
+  const name = document.getElementById('new-chat-email').value.trim();
+  if(!name){ alert('Enter a name or email'); return; }
+  let conv = conversations.find(c => c.peerName.toLowerCase() === name.toLowerCase());
+  if(!conv){
+    conv = { id: uid(), peerName: name, peerId: 'peer_'+uid(), messages: [], created: now() };
+    conversations.unshift(conv);
+    persistConversations();
+  }
+  closeNewChat();
+  openChat(conv.id);
+  renderConversations();
+}
+
+function openChat(id){
+  activeChatId = id;
+  const conv = conversations.find(c=>c.id===id);
+  if(!conv) return;
+  document.getElementById('msg-empty').classList.add('hidden');
+  document.getElementById('msg-active').classList.remove('hidden');
+  document.getElementById('chat-peer-name').textContent = conv.peerName;
+  document.getElementById('chat-peer-avatar').textContent = initials(conv.peerName);
+  if(window.innerWidth < 640){
+    document.getElementById('msg-list-panel').classList.add('hidden');
+    document.getElementById('msg-chat-panel').classList.remove('hidden');
+    document.getElementById('msg-chat-panel').classList.add('flex');
+  }
+  renderMessages();
+  renderConversations();
+}
+
+function closeChatMobile(){
+  document.getElementById('msg-list-panel').classList.remove('hidden');
+  document.getElementById('msg-chat-panel').classList.add('hidden');
+  activeChatId = null;
+}
+
+function renderMessages(){
+  const conv = conversations.find(c=>c.id===activeChatId);
+  if(!conv) return;
+  const box = document.getElementById('chat-messages');
+  box.innerHTML = conv.messages.map(m=>{
+    const mine = m.from === currentUser.id;
+    return `
+    <div class="flex ${mine?'justify-end':''}">
+      <div class="max-w-[75%] px-3 py-2 rounded-2xl text-sm ${mine?'bg-fb-primary text-white':'bg-fb-card border border-fb-border'}">
+        ${m.text}
+        <div class="text-[10px] opacity-60 mt-0.5 text-right">${timeAgo(m.created)}</div>
+      </div>
+    </div>`;
+  }).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+function sendMessage(){
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if(!text || !activeChatId) return;
+  const conv = conversations.find(c=>c.id===activeChatId);
+  if(!conv) return;
+  conv.messages.push({ id: uid(), from: currentUser.id, text, created: now() });
+  persistConversations();
+  input.value = '';
+  renderMessages();
+  renderConversations();
+}
+
+function switchTab(tab){
+  ['feed','stories','messenger','profile'].forEach(t=>{
+    const v = document.getElementById('view-'+t);
+    if(v) v.classList.toggle('hidden', t!==tab);
+    const btn = document.getElementById('tab-'+t);
+    if(btn){
+      if(t===tab){ btn.classList.add('text-fb-primary','border-b-2','border-fb-primary'); btn.classList.remove('text-fb-secondary'); }
+      else { btn.classList.remove('text-fb-primary','border-b-2','border-fb-primary'); btn.classList.add('text-fb-secondary'); }
+    }
+  });
+  if(tab==='stories'){
+    document.getElementById('all-stories').innerHTML = stories.length ? stories.map(s=>`
+      <div class="bg-fb-card rounded-xl p-3 flex gap-3 cursor-pointer" onclick="viewStory('${s.id}')">
+        <img src="${s.photo}" class="w-16 h-16 rounded-lg object-cover">
+        <div>
+          <div class="font-semibold text-sm">${s.author}</div>
+          <div class="text-xs text-fb-secondary">${timeAgo(s.created)}</div>
+          <div class="text-xs mt-1">${s.caption||''}</div>
+        </div>
+      </div>
+    `).join('') : '<p class="text-fb-secondary text-sm">No active stories. Share one from the Feed!</p>';
+  }
+}
+
+function openProfile(){ switchTab('profile'); }
+
+window.addEventListener('DOMContentLoaded', ()=>{
+  const logoData = LOGO_B64;
+  document.getElementById('auth-logo').src = logoData;
+  document.getElementById('header-logo').src = logoData;
+
+  const session = load('session', null);
+  if(session){
+    currentUser = session;
+    enterApp();
+  } else {
+    document.getElementById('auth-screen').classList.remove('hidden');
+    showLogin();
+  }
+});
+</script>
 </body>
 </html>
